@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
         from agents.agents import AgentPipeline
         _pipeline = AgentPipeline(
             db             = _db,
-            openai_api_key = os.getenv("GEMINI_API_KEY", ""),
+            openai_api_key = os.getenv("GOOGLE_API_KEY", ""),
             poll_interval  = int(os.getenv("MONITOR_INTERVAL", "60")),
         )
         _pipeline.start_monitoring()
@@ -234,12 +234,12 @@ def get_dashboard(project: Optional[str] = Query(None)):
         plan      = pipeline.planning.create_mitigation_plan(risk_map, node_map)
         known_ids = set(node_map.keys())
 
-        if os.getenv("GEMINI_API_KEY", "").startswith("AIza"):
+        if os.getenv("GOOGLE_API_KEY", "").startswith("AIza"):
             llm_out   = pipeline.decision.summarise_project_risks(top_risks, plan)
             validated = pipeline.critic.validate(llm_out, None, known_ids)
         else:
             validated = {
-                "summary":         "Add GEMINI_API_KEY to .env to enable LLM explanations.",
+                "summary":         "Add GOOGLE_API_KEY to .env to enable LLM explanations.",
                 "root_causes":     [r.issue_id for r in top_risks[:3] if r.is_origin],
                 "recommendations": [p["rationale"] for p in plan[:3]],
                 "confidence":      0.0,

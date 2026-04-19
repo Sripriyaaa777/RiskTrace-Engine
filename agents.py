@@ -230,64 +230,51 @@ class PlanningAgent:
 
 class DecisionAgent:
     """
-    Uses Google Gemini 1.5 Flash to generate human-readable explanations
-    and actionable recommendations from structured risk data.
+    Uses Google Gemini 2.0 Flash via the new google-genai SDK.
+    Install: pip install google-genai
 
     The LLM only runs AFTER the deterministic risk engine has computed
-    scores and chains. Its job is explanation, not reasoning —
-    this design keeps hallucination low and confidence high.
+    scores and chains. Its job is explanation, not reasoning.
     """
 
-    SYSTEM_PROMPT = """You are IssueGraphAgent++, an expert AI assistant
-specialised in software project risk management.
+    SYSTEM_PROMPT = (
+        "You are IssueGraphAgent++, an expert AI assistant specialised in "
+        "software project risk management. You receive structured JSON data "
+        "from a deterministic risk propagation engine that has already computed "
+        "dependency chains and risk scores. Your job is to:\n"
+        "1. Explain the risk situation clearly and concisely to a project manager.\n"
+        "2. Recommend specific, actionable interventions.\n"
+        "3. Prioritise the interventions by impact.\n\n"
+        "Rules:\n"
+        "- Be direct and specific. Name the actual issue IDs.\n"
+        "- Explain dependency chains in plain English.\n"
+        "- Never fabricate issue IDs, delays, or scores not in the input.\n"
+        "- Keep responses under 300 words.\n"
+        "- Respond ONLY with a valid JSON object — no markdown, no extra text.\n"
+        "- Required JSON keys: summary (string), root_causes (list of strings), "
+        "recommendations (list of strings), confidence (float 0-1)."
+    )
 
-You receive structured JSON data from a deterministic risk propagation
-engine that has already computed dependency chains and risk scores.
-Your job is to:
-1. Explain the risk situation clearly and concisely to a project manager.
-2. Recommend specific, actionable interventions.
-3. Prioritise the interventions by impact.
-
-Rules:
-- Be direct and specific. Name the actual issue IDs.
-- Explain dependency chains in plain English.
-- Never fabricate issue IDs, delays, or scores not present in the input.
-- Keep responses under 300 words.
-- Respond ONLY with a valid JSON object — no markdown, no extra text.
-- JSON keys required: summary (string), root_causes (list of strings),
-  recommendations (list of strings), confidence (float 0-1).
-"""
-
-    def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
         self.model_name = model
-        self.api_key = api_key
-        self._model = None  # lazy init
+        self.api_key    = api_key
+        self._client    = None
+        self._types     = None
 
-    def _get_model(self):
-        """Lazy initialise Gemini so import errors surface clearly."""
-        if self._model is not None:
-            return self._model
+    def _get_client(self):
+        if self._client is not None:
+            return self._client
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            self._model = genai.GenerativeModel(
-                model_name=self.model_name,
-                system_instruction=self.SYSTEM_PROMPT,
-            )
-            log.info("DecisionAgent: Gemini %s initialised", self.model_name)
-            return self._model
+            from google import genai
+            from google.genai import types as genai_types
+            self._client = genai.Client(api_key=self.api_key)
+            self._types  = genai_types
+            log.info("DecisionAgent: google-genai client ready (model: %s)", self.model_name)
+            return self._client
         except ImportError:
-            raise ImportError(
-                "google-generativeai not installed. Run: pip install google-generativeai"
-            )
+            raise ImportError("google-genai not installed. Run: pip install google-genai")
 
-    def explain_issue_risk(
-        self,
-        issue_id: str,
-        risk_result: RiskResult,
-        chain: list[IssueNode],
-        plan: list[dict],
-    ) -> dict:
+    def explain_issue_risk(self, issue_id, risk_result, chain, plan):
         context = {
             "query_issue":      issue_id,
             "risk_score":       risk_result.risk_score,
@@ -312,11 +299,7 @@ Rules:
         )
         return self._call_llm(prompt)
 
-    def summarise_project_risks(
-        self,
-        top_risks: list[RiskResult],
-        plan: list[dict],
-    ) -> dict:
+    def summarise_project_risks(self, top_risks, plan):
         context = {
             "top_risks": [
                 {"issue_id": r.issue_id, "risk_level": r.risk_level,
@@ -334,21 +317,41 @@ Rules:
         )
         return self._call_llm(prompt)
 
-    def _call_llm(self, user_prompt: str) -> dict:
-        """Call Gemini and parse the JSON response."""
-        try:
-            model = self._get_model()
-            response = model.generate_content(
-                user_prompt,
-                generation_config={
-                    "temperature":     0.2,
-                    "max_output_tokens": 600,
-                    "response_mime_type": "application/json",  # force JSON output
-                },
-            )
-            raw = response.text.strip()
+    def _get_client(self):
+        return self  # requests-based, no SDK client needed
 
-            # Strip markdown code fences if Gemini wraps the JSON
+    def _call_llm(self, user_prompt: str) -> dict:
+        """Call Gemini REST API directly with requests — no SDK needed."""
+        import requests as _requests
+        import traceback as _traceback
+        try:
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{self.model_name}:generateContent?key={self.api_key}"
+            )
+            full_prompt = self.SYSTEM_PROMPT + "\n\n" + user_prompt
+            payload = {
+                "contents": [{"parts": [{"text": full_prompt}]}],
+                "generationConfig": {
+                    "temperature":       0.2,
+                    "maxOutputTokens":   800,
+                    "responseMimeType":  "application/json",
+                },
+            }
+            resp = _requests.post(url, json=payload, timeout=30)
+
+            # Handle rate limiting with one retry
+            if resp.status_code == 429:
+                import time
+                log.warning("Gemini rate limited — waiting 30s and retrying...")
+                time.sleep(30)
+                resp = _requests.post(url, json=payload, timeout=30)
+
+            resp.raise_for_status()
+
+            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+            # Strip markdown fences just in case model ignores responseMimeType
             if raw.startswith("```"):
                 raw = re.sub(r"^```(?:json)?\n?", "", raw)
                 raw = re.sub(r"\n?```$", "", raw)
@@ -356,7 +359,7 @@ Rules:
             return json.loads(raw)
 
         except Exception as e:
-            log.error("DecisionAgent LLM call failed: %s", e)
+            log.error("DecisionAgent LLM call failed: %s\n%s", e, _traceback.format_exc())
             return {
                 "summary":         "LLM unavailable. See structured data.",
                 "root_causes":     [],
@@ -364,11 +367,6 @@ Rules:
                 "confidence":      0.0,
                 "error":           str(e),
             }
-
-
-# ─────────────────────────────────────────────
-# Monitoring Agent
-# ─────────────────────────────────────────────
 
 class MonitoringAgent:
     def __init__(
