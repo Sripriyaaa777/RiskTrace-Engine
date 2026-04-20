@@ -230,8 +230,9 @@ class PlanningAgent:
 
 class DecisionAgent:
     """
-    Uses Google Gemini 2.0 Flash via the new google-genai SDK.
-    Install: pip install google-genai
+    Uses Groq (llama-3.3-70b) for LLM explanations and recommendations.
+    Groq is free, fast (500 tokens/sec), and has 30 RPM on free tier.
+    Get a free key at: https://console.groq.com
 
     The LLM only runs AFTER the deterministic risk engine has computed
     scores and chains. Its job is explanation, not reasoning.
@@ -255,24 +256,21 @@ class DecisionAgent:
         "recommendations (list of strings), confidence (float 0-1)."
     )
 
-    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile"):
         self.model_name = model
         self.api_key    = api_key
         self._client    = None
-        self._types     = None
 
     def _get_client(self):
         if self._client is not None:
             return self._client
         try:
-            from google import genai
-            from google.genai import types as genai_types
-            self._client = genai.Client(api_key=self.api_key)
-            self._types  = genai_types
-            log.info("DecisionAgent: google-genai client ready (model: %s)", self.model_name)
+            from groq import Groq
+            self._client = Groq(api_key=self.api_key)
+            log.info("DecisionAgent: Groq client ready (model: %s)", self.model_name)
             return self._client
         except ImportError:
-            raise ImportError("google-genai not installed. Run: pip install google-genai")
+            raise ImportError("groq not installed. Run: pip install groq")
 
     def explain_issue_risk(self, issue_id, risk_result, chain, plan):
         context = {
@@ -317,41 +315,24 @@ class DecisionAgent:
         )
         return self._call_llm(prompt)
 
-    def _get_client(self):
-        return self  # requests-based, no SDK client needed
-
     def _call_llm(self, user_prompt: str) -> dict:
-        """Call Gemini REST API directly with requests — no SDK needed."""
-        import requests as _requests
-        import traceback as _traceback
+        """Call Groq API and return parsed JSON."""
+        import traceback as _tb
         try:
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{self.model_name}:generateContent?key={self.api_key}"
+            client = self._get_client()
+            response = client.chat.completions.create(
+                model       = self.model_name,
+                messages    = [
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_prompt},
+                ],
+                temperature = 0.2,
+                max_tokens  = 800,
+                response_format = {"type": "json_object"},  # forces clean JSON
             )
-            full_prompt = self.SYSTEM_PROMPT + "\n\n" + user_prompt
-            payload = {
-                "contents": [{"parts": [{"text": full_prompt}]}],
-                "generationConfig": {
-                    "temperature":       0.2,
-                    "maxOutputTokens":   800,
-                    "responseMimeType":  "application/json",
-                },
-            }
-            resp = _requests.post(url, json=payload, timeout=30)
+            raw = response.choices[0].message.content.strip()
 
-            # Handle rate limiting with one retry
-            if resp.status_code == 429:
-                import time
-                log.warning("Gemini rate limited — waiting 30s and retrying...")
-                time.sleep(30)
-                resp = _requests.post(url, json=payload, timeout=30)
-
-            resp.raise_for_status()
-
-            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-            # Strip markdown fences just in case model ignores responseMimeType
+            # Strip markdown fences just in case
             if raw.startswith("```"):
                 raw = re.sub(r"^```(?:json)?\n?", "", raw)
                 raw = re.sub(r"\n?```$", "", raw)
@@ -359,7 +340,7 @@ class DecisionAgent:
             return json.loads(raw)
 
         except Exception as e:
-            log.error("DecisionAgent LLM call failed: %s\n%s", e, _traceback.format_exc())
+            log.error("DecisionAgent LLM call failed: %s\n%s", e, _tb.format_exc())
             return {
                 "summary":         "LLM unavailable. See structured data.",
                 "root_causes":     [],
@@ -367,6 +348,7 @@ class DecisionAgent:
                 "confidence":      0.0,
                 "error":           str(e),
             }
+
 
 class MonitoringAgent:
     def __init__(

@@ -82,9 +82,10 @@ async def lifespan(app: FastAPI):
     try:
         _db, _db_mode = create_db()
         from agents.agents import AgentPipeline
+        api_key = os.getenv("GROQ_API_KEY", "")
         _pipeline = AgentPipeline(
             db             = _db,
-            openai_api_key = os.getenv("GOOGLE_API_KEY", ""),
+            openai_api_key = api_key,
             poll_interval  = int(os.getenv("MONITOR_INTERVAL", "60")),
         )
         _pipeline.start_monitoring()

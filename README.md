@@ -198,3 +198,11 @@ Key files to reference in your implementation section:
 - `evaluation/evaluate.py`  — Section 9 (evaluation framework)
 - `data/processed/stats.json` — Table 1 (dataset statistics)
 - `evaluation/results.json` — Table 2 (experimental results)
+
+
+## Commands to execute
+
+- first : python scripts/preprocess.py --synthetic [for generating the preprocessed synthetic dataset]
+- second : python -m uvicorn api.main:app --reload --port 8000
+- third : (preferably in another window shell after running the second) :  Invoke-RestMethod -Uri "http://127.0.0.1:8000/query" -Method POST -ContentType "application/json" -Body '{"query": "What are the riskiest tasks?"}' | ConvertTo-Json -Depth 10
+
