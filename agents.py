@@ -315,6 +315,26 @@ class DecisionAgent:
         )
         return self._call_llm(prompt)
 
+    def summarise_project_risks_focused(self, top_risks, plan, focus_instruction: str):
+        context = {
+            "focus":      focus_instruction,
+            "top_risks":  [
+                {"issue_id": r.issue_id, "risk_level": r.risk_level,
+                 "risk_score": r.risk_score, "is_origin": r.is_origin,
+                 "delay_days": r.delay_days, "affected_by": r.affected_by[:5],
+                 "explanation": r.explanation[:150]}
+                for r in top_risks
+            ],
+            "action_plan": plan[:5],
+        }
+        prompt = (
+            f"Instructions: {focus_instruction}\n\n"
+            f"Project risk data:\n{json.dumps(context, indent=2)}\n\n"
+            "Respond ONLY with a JSON object with keys: "
+            "summary, root_causes, recommendations, confidence."
+        )
+        return self._call_llm(prompt)
+
     def _call_llm(self, user_prompt: str) -> dict:
         """Call Groq API and return parsed JSON."""
         import traceback as _tb
@@ -516,9 +536,9 @@ class AgentPipeline:
     def run_query(self, user_query: str, project: Optional[str] = None) -> dict:
         log.info("AgentPipeline.run_query: %r", user_query)
 
-        nodes    = self.perception.fetch_all_nodes(project)
-        edges    = self.perception.fetch_all_edges()
-        node_map = {n.issue_id: n for n in nodes}
+        nodes     = self.perception.fetch_all_nodes(project)
+        edges     = self.perception.fetch_all_edges()
+        node_map  = {n.issue_id: n for n in nodes}
         known_ids = set(node_map.keys())
 
         specific_id = self._extract_issue_id(user_query, known_ids)
@@ -531,12 +551,17 @@ class AgentPipeline:
             issue_plan   = [p for p in plan if p["issue_id"] == specific_id]
 
             if risk_result is None:
-                return {"issue_id": specific_id,
-                        "message": f"{specific_id} has no computed risk — it may be Done or not at risk.",
-                        "risk_level": "None", "risk_score": 0.0}
+                return {
+                    "issue_id":   specific_id,
+                    "message":    f"{specific_id} has no computed risk — it may be Done or not at risk.",
+                    "risk_level": "None",
+                    "risk_score": 0.0,
+                }
 
-            llm_output = self.decision.explain_issue_risk(specific_id, risk_result, chain, issue_plan)
-            validated  = self.critic.validate(llm_output, risk_result, known_ids)
+            llm_output = self.decision.explain_issue_risk(
+                specific_id, risk_result, chain, issue_plan
+            )
+            validated = self.critic.validate(llm_output, risk_result, known_ids)
 
             return {
                 "issue_id":         specific_id,
@@ -549,18 +574,46 @@ class AgentPipeline:
                 "explanation":      risk_result.explanation,
                 "llm_analysis":     validated,
             }
+
         else:
-            top_risks    = self.reasoning.top_risky_issues(k=10, project=project)
+            # Route different query types to different analyses
+            query_lower = user_query.lower()
+            top_risks   = self.reasoning.top_risky_issues(k=10, project=project)
             risk_results = {r.issue_id: r for r in top_risks}
-            plan         = self.planning.create_mitigation_plan(risk_results, node_map)
-            llm_output   = self.decision.summarise_project_risks(top_risks, plan)
-            validated    = self.critic.validate(llm_output, None, known_ids)
+            plan        = self.planning.create_mitigation_plan(risk_results, node_map)
+
+            # Build a query-aware prompt so Groq gives different answers
+            if any(w in query_lower for w in ["block", "blocked", "blocking"]):
+                focus = "Focus specifically on blocked issues and what is blocking them."
+                subset = [r for r in top_risks if r.status == "Blocked"][:5] or top_risks[:5]
+            elif any(w in query_lower for w in ["delay", "overdue", "late", "behind"]):
+                focus = "Focus specifically on overdue issues and their delay severity."
+                subset = [r for r in top_risks if (r.delay_days or 0) > 0][:5] or top_risks[:5]
+            elif any(w in query_lower for w in ["root", "cause", "origin", "source"]):
+                focus = "Focus on root cause issues — the origin nodes that are causing cascading risk."
+                subset = [r for r in top_risks if r.is_origin][:5] or top_risks[:5]
+            elif any(w in query_lower for w in ["fix", "solve", "mitigate", "action", "recommend"]):
+                focus = "Focus on actionable recommendations — what should be done first and why."
+                subset = top_risks[:5]
+            elif any(w in query_lower for w in ["summary", "overview", "status", "state"]):
+                focus = "Give a high-level executive summary of the current project risk state."
+                subset = top_risks[:8]
+            else:
+                focus = f'The user asked: "{user_query}". Answer this question specifically using the data.'
+                subset = top_risks[:8]
+
+            llm_output = self.decision.summarise_project_risks_focused(subset, plan, focus)
+            validated  = self.critic.validate(llm_output, None, known_ids)
 
             return {
                 "top_risks": [
-                    {"issue_id": r.issue_id, "risk_level": r.risk_level,
-                     "risk_score": r.risk_score, "is_origin": r.is_origin,
-                     "explanation": r.explanation}
+                    {
+                        "issue_id":    r.issue_id,
+                        "risk_level":  r.risk_level,
+                        "risk_score":  r.risk_score,
+                        "is_origin":   r.is_origin,
+                        "explanation": r.explanation,
+                    }
                     for r in top_risks
                 ],
                 "action_plan":  plan,
@@ -571,13 +624,23 @@ class AgentPipeline:
         return self.monitoring.get_alerts(clear=True)
 
     @staticmethod
+    @staticmethod
     def _extract_issue_id(query: str, known_ids: set[str]) -> Optional[str]:
+        # Match explicit Jira IDs like HADOOP-42
         matches = re.findall(r'\b([A-Z]+-\d+)\b', query)
         for m in matches:
             if m in known_ids:
                 return m
+        # Match partial like "HADOOP 8", "hadoop-8", "task 8"
         query_upper = query.upper()
         for iid in known_ids:
             if iid in query_upper:
                 return iid
+        # Match number-only mentions like "issue 8" or "task 8"
+        num_match = re.search(r'\b(?:issue|task|ticket|item)\s+(\d+)\b', query, re.IGNORECASE)
+        if num_match:
+            num = num_match.group(1)
+            for iid in known_ids:
+                if iid.endswith(f"-{num}"):
+                    return iid
         return None
