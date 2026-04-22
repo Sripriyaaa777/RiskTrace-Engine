@@ -92,16 +92,6 @@ class PerceptionAgent:
         log.debug("PerceptionAgent: fetched %d edges", len(edges))
         return edges
 
-    def fetch_all_nodes_including_done(self, project: Optional[str] = None) -> list[IssueNode]:
-        """Fetch ALL nodes including Done — used only by counterfactual to see full graph."""
-        if project:
-            query = "MATCH (n:Issue {project: $project}) RETURN n {.*} AS props"
-            records = self.db.run(query, {"project": project})
-        else:
-            query = "MATCH (n:Issue) RETURN n {.*} AS props"
-            records = self.db.run(query)
-        return [neo4j_record_to_issue_node(r["props"]) for r in records]
-
     def fetch_node(self, issue_id: str) -> Optional[IssueNode]:
         query = "MATCH (n:Issue {issue_id: $issue_id}) RETURN n {.*} AS props"
         record = self.db.run(query, {"issue_id": issue_id}).single()
@@ -185,131 +175,6 @@ class GraphReasoningAgent:
         records = self.perception.db.run(query)
         return [neo4j_record_to_issue_node(r["props"]) for r in records]
 
-    def counterfactual_resolve(
-        self,
-        issue_id: str,
-        resolve_as: str = "Done",
-    ) -> dict:
-        """
-        Counterfactual reasoning: hypothetically resolve `issue_id` and
-        rerun risk propagation on the cloned graph.
-
-        No writes are made to the database — all computation is in-memory.
-        Returns before/after risk scores + a structured diff for every
-        downstream node, enabling Layer 1 (quantitative) and Layer 2
-        (visual graph diff) of the What-If feature.
-        """
-        # ── Fetch real graph state (ALL nodes including Done) ──────
-        nodes = self.perception.fetch_all_nodes_including_done()
-        edges = self.perception.fetch_all_edges()
-
-        # ── BEFORE: propagation on the real graph ──────────────────
-        before_results = run_propagation(nodes, edges, self.config)
-
-        # ── Clone & patch the target node ──────────────────────────
-        cloned_nodes: list[IssueNode] = []
-        for n in nodes:
-            if n.issue_id == issue_id:
-                cloned_nodes.append(IssueNode(
-                    issue_id   = n.issue_id,
-                    project    = n.project,
-                    summary    = n.summary,
-                    status     = resolve_as,   # "Done" removes it from propagation
-                    priority   = n.priority,
-                    assignee   = n.assignee,
-                    due_date   = n.due_date,
-                    updated    = n.updated,
-                    delay_days = 0.0,
-                    is_delayed = False,
-                ))
-            else:
-                cloned_nodes.append(n)
-
-        # ── AFTER: propagation on the patched clone ─────────────────
-        after_results = run_propagation(cloned_nodes, edges, self.config)
-
-        # ── Build the diff ──────────────────────────────────────────
-        all_ids = set(before_results.keys()) | set(after_results.keys())
-        all_ids.discard(issue_id)
-
-        diff = []
-        total_delay_saved = 0.0
-        high_before = high_after = improved = worsened = 0
-
-        for nid in all_ids:
-            b = before_results.get(nid)
-            a = after_results.get(nid)
-            b_score = b.risk_score if b else 0.0
-            a_score = a.risk_score if a else 0.0
-            b_level = b.risk_level if b else "None"
-            a_level = a.risk_level if a else "None"
-            delta   = round(a_score - b_score, 3)
-
-            if b_level == "High":
-                high_before += 1
-            if a_level == "High":
-                high_after  += 1
-
-            if delta < -0.01:
-                improved += 1
-                node_obj = next((n for n in nodes if n.issue_id == nid), None)
-                if node_obj and node_obj.delay_days:
-                    total_delay_saved += abs(delta) * node_obj.delay_days
-            elif delta > 0.01:
-                worsened += 1
-
-            if abs(delta) > 0.005:
-                diff.append({
-                    "issue_id":     nid,
-                    "summary":      (b or a).summary if (b or a) else nid,
-                    "before_score": b_score,
-                    "after_score":  a_score,
-                    "before_level": b_level,
-                    "after_level":  a_level,
-                    "delta":        delta,
-                    "improved":     delta < 0,
-                })
-
-        diff.sort(key=lambda x: x["delta"])  # most-improved first
-
-        resolved_node = next((n for n in nodes if n.issue_id == issue_id), None)
-
-        # Build full node list for graph diff visualisation
-        # Each node gets its before/after state so the UI can draw the diff graph
-        all_node_ids = list({n.issue_id for n in nodes})
-        graph_nodes = []
-        for n in nodes:
-            b = before_results.get(n.issue_id)
-            a = after_results.get(n.issue_id)
-            is_resolved = n.issue_id == issue_id
-            graph_nodes.append({
-                "id":           n.issue_id,
-                "summary":      n.summary[:80],
-                "status":       n.status,
-                "priority":     n.priority,
-                "is_resolved":  is_resolved,
-                "before_score": b.risk_score if b else 0.0,
-                "after_score":  a.risk_score if a else (0.0 if is_resolved else (b.risk_score if b else 0.0)),
-                "before_level": b.risk_level if b else "None",
-                "after_level":  a.risk_level if a else "None",
-            })
-
-        return {
-            "issue_id":    issue_id,
-            "summary":     resolved_node.summary if resolved_node else issue_id,
-            "resolved_as": resolve_as,
-            "diff":        diff,
-            "graph_nodes": graph_nodes,
-            "graph_edges": [{"source": s, "target": t} for s, t in edges],
-            "impact_summary": {
-                "nodes_improved":         improved,
-                "nodes_worsened":         worsened,
-                "nodes_unchanged":        len(all_ids) - improved - worsened,
-                "total_delay_days_saved": round(total_delay_saved, 1),
-                "high_risk_reduction":    max(high_before - high_after, 0),
-            },
-        }
-
 
 # ─────────────────────────────────────────────
 # Planning Agent
@@ -365,31 +230,35 @@ class PlanningAgent:
 
 class DecisionAgent:
     """
-    Uses Groq (llama-3.3-70b) for LLM explanations and recommendations.
-    Groq is free, fast (500 tokens/sec), and has 30 RPM on free tier.
-    Get a free key at: https://console.groq.com
+    LLM-powered explanation and recommendation layer.
 
-    The LLM only runs AFTER the deterministic risk engine has computed
-    scores and chains. Its job is explanation, not reasoning.
+    Uses a graph-aware system prompt + structured task-specific prompts
+    (Steps 1, 2, 4, 5 of the prompt engineering plan).
+    The LLM never does risk computation — it only explains and recommends
+    based on data already computed by the deterministic engine.
     """
 
-    SYSTEM_PROMPT = (
-        "You are IssueGraphAgent++, an expert AI assistant specialised in "
-        "software project risk management. You receive structured JSON data "
-        "from a deterministic risk propagation engine that has already computed "
-        "dependency chains and risk scores. Your job is to:\n"
-        "1. Explain the risk situation clearly and concisely to a project manager.\n"
-        "2. Recommend specific, actionable interventions.\n"
-        "3. Prioritise the interventions by impact.\n\n"
-        "Rules:\n"
-        "- Be direct and specific. Name the actual issue IDs.\n"
-        "- Explain dependency chains in plain English.\n"
-        "- Never fabricate issue IDs, delays, or scores not in the input.\n"
-        "- Keep responses under 300 words.\n"
-        "- Respond ONLY with a valid JSON object — no markdown, no extra text.\n"
-        "- Required JSON keys: summary (string), root_causes (list of strings), "
-        "recommendations (list of strings), confidence (float 0-1)."
-    )
+    # ── STEP 5: Reusable graph-aware system prompt ────────────────────
+    SYSTEM_PROMPT = """You are a graph-aware AI system specialised in software project risk analysis.
+
+You reason using:
+- Dependency graphs (which issue blocks which)
+- Risk propagation scores (computed by a deterministic engine)
+- Temporal delays (how many days overdue each issue is)
+
+You NEVER:
+- Invent dependencies not present in the provided data
+- Assume missing issue IDs or delay values
+- Give generic answers that ignore the actual issue IDs
+
+You ALWAYS:
+- Reference issue IDs explicitly (e.g., HADOOP-16, KAFKA-23)
+- Explain risk using graph relationships (X is blocked because Y depends on Z)
+- Base all reasoning ONLY on the structured data provided
+
+Respond ONLY with a valid JSON object. No markdown, no preamble, no explanation outside the JSON.
+Required keys: summary (string), root_causes (list of strings), recommendations (list of strings), confidence (float 0-1).
+"""
 
     def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile"):
         self.model_name = model
@@ -407,93 +276,190 @@ class DecisionAgent:
         except ImportError:
             raise ImportError("groq not installed. Run: pip install groq")
 
-    def explain_issue_risk(self, issue_id, risk_result, chain, plan):
-        context = {
-            "query_issue":      issue_id,
-            "risk_score":       risk_result.risk_score,
-            "risk_level":       risk_result.risk_level,
-            "status":           risk_result.status,
-            "delay_days":       risk_result.delay_days,
-            "affected_by":      risk_result.affected_by,
-            "dependency_chain": risk_result.chain,
-            "explanation":      risk_result.explanation,
-            "upstream_issues": [
-                {"issue_id": n.issue_id, "status": n.status,
-                 "is_delayed": n.is_delayed, "delay_days": n.delay_days}
-                for n in chain
-            ],
-            "recommended_actions": plan[:3],
-        }
-        prompt = (
-            f"Analyse the risk for issue {issue_id} using this data:\n\n"
-            f"{json.dumps(context, indent=2)}\n\n"
-            "Respond ONLY with a JSON object with keys: "
-            "summary, root_causes, recommendations, confidence."
-        )
-        return self._call_llm(prompt)
-
+    # ── STEP 1: Structured project risk summary prompt ────────────────
     def summarise_project_risks(self, top_risks, plan):
-        context = {
-            "top_risks": [
-                {"issue_id": r.issue_id, "risk_level": r.risk_level,
-                 "risk_score": r.risk_score, "is_origin": r.is_origin,
-                 "delay_days": r.delay_days, "affected_by": r.affected_by[:5]}
-                for r in top_risks[:10]
-            ],
-            "action_plan": plan[:5],
-        }
-        prompt = (
-            "Summarise the current project risk state based on this data:\n\n"
-            f"{json.dumps(context, indent=2)}\n\n"
-            "Respond ONLY with a JSON object with keys: "
-            "summary, root_causes, recommendations, confidence."
-        )
+        """
+        Upgraded prompt: identifies root causes, explains propagation,
+        and gives top 3 actionable mitigations. (Step 1)
+        """
+        risk_lines = []
+        for r in top_risks[:10]:
+            line = (
+                f"  - {r.issue_id}: risk={r.risk_score:.2f} level={r.risk_level}"
+                f" is_root_cause={r.is_origin}"
+            )
+            if r.delay_days:
+                line += f" delay={r.delay_days:.1f}d"
+            if r.affected_by:
+                line += f" blocked_by={r.affected_by[:3]}"
+            if r.chain:
+                line += f" chain={' → '.join(r.chain[:5])}"
+            risk_lines.append(line)
+
+        plan_lines = []
+        for p in plan[:5]:
+            plan_lines.append(
+                f"  - {p['issue_id']}: action={p['action']} "
+                f"downstream_impact={p['downstream_count']} rationale={p['rationale']}"
+            )
+
+        prompt = f"""You are a software project risk analyst.
+
+You are given:
+1. A list of high-risk issues with their dependency chains
+2. A computed mitigation plan
+
+Your tasks:
+1. Identify the root cause issues (those marked is_root_cause=True — these have no upstream blockers)
+2. Explain how risk propagates across the dependency graph (trace the chains)
+3. Suggest the top 3 most effective mitigation actions based on downstream impact
+
+STRICT RULES:
+- Use ONLY the provided data
+- Mention issue IDs explicitly (e.g., HADOOP-16, KAFKA-23)
+- Keep explanations concise and technical
+- Do NOT hallucinate missing dependencies
+
+DATA:
+Top Risk Issues:
+{chr(10).join(risk_lines)}
+
+Mitigation Plan:
+{chr(10).join(plan_lines) if plan_lines else "  No plan generated."}
+
+Respond with a JSON object: summary, root_causes, recommendations, confidence."""
         return self._call_llm(prompt)
 
+    # ── STEP 1 variant: focused summary for specific query types ──────
     def summarise_project_risks_focused(self, top_risks, plan, focus_instruction: str):
-        context = {
-            "focus":      focus_instruction,
-            "top_risks":  [
-                {"issue_id": r.issue_id, "risk_level": r.risk_level,
-                 "risk_score": r.risk_score, "is_origin": r.is_origin,
-                 "delay_days": r.delay_days, "affected_by": r.affected_by[:5],
-                 "explanation": r.explanation[:150]}
-                for r in top_risks
-            ],
-            "action_plan": plan[:5],
-        }
-        prompt = (
-            f"Instructions: {focus_instruction}\n\n"
-            f"Project risk data:\n{json.dumps(context, indent=2)}\n\n"
-            "Respond ONLY with a JSON object with keys: "
-            "summary, root_causes, recommendations, confidence."
-        )
+        """Focused variant that adjusts the analysis based on query intent."""
+        risk_lines = []
+        for r in top_risks[:8]:
+            line = (
+                f"  - {r.issue_id}: risk={r.risk_score:.2f} level={r.risk_level}"
+                f" is_root_cause={r.is_origin} status={r.status}"
+            )
+            if r.delay_days:
+                line += f" delay={r.delay_days:.1f}d"
+            if r.affected_by:
+                line += f" blocked_by={r.affected_by[:3]}"
+            if r.chain:
+                line += f" dep_chain={' → '.join(r.chain[:4])}"
+            if r.explanation:
+                line += f" context: {r.explanation[:100]}"
+            risk_lines.append(line)
+
+        prompt = f"""You are a software project risk analyst.
+
+FOCUS INSTRUCTION: {focus_instruction}
+
+Project risk data:
+{chr(10).join(risk_lines)}
+
+Action plan top items:
+{chr(10).join(f"  - {p['issue_id']}: {p['action']} — {p['rationale']}" for p in plan[:3])}
+
+Answer the user's specific question using the data above.
+Reference issue IDs. Explain using dependency relationships.
+Respond with a JSON object: summary, root_causes, recommendations, confidence."""
+        return self._call_llm(prompt)
+
+    # ── STEP 2: Context-aware issue-specific prompt ───────────────────
+    def explain_issue_risk(self, issue_id, risk_result, chain, plan):
+        """
+        Upgraded prompt: uses full dependency context and query-aware
+        instructions to give a precise, non-generic explanation. (Step 2)
+        """
+        upstream_lines = []
+        for n in chain[:10]:
+            line = f"  - {n.issue_id}: status={n.status}"
+            if n.is_delayed:
+                line += f" OVERDUE by {n.delay_days:.1f}d"
+            upstream_lines.append(line)
+
+        dep_chain_str = " → ".join(risk_result.chain) if risk_result.chain else "no chain"
+        affected_str  = ", ".join(risk_result.affected_by[:5]) if risk_result.affected_by else "none"
+
+        prompt = f"""You are an intelligent assistant for software project risk analysis.
+
+Context:
+- Issue ID: {issue_id}
+- Risk Score: {risk_result.risk_score:.2f} ({risk_result.risk_level})
+- Status: {risk_result.status}
+- Is Root Cause: {risk_result.is_origin}
+- Delay: {f"{risk_result.delay_days:.1f} days overdue" if risk_result.delay_days else "no deadline data"}
+- Dependency chain: {dep_chain_str}
+- Blocked by (upstream at-risk issues): {affected_str}
+
+Upstream dependency nodes:
+{chr(10).join(upstream_lines) if upstream_lines else "  No upstream dependencies found."}
+
+Recommended actions for this issue:
+{chr(10).join(f"  - {p['action']}: {p['rationale']}" for p in plan[:3]) if plan else "  No specific plan."}
+
+Instructions:
+- Answer specifically about {issue_id}, not generically
+- If the question involves risk, explain using the dependency chain above
+- Identify which upstream issue is the root blocker
+- Be precise and avoid repeating the raw data — synthesise it into insight
+
+Respond with a JSON object: summary, root_causes, recommendations, confidence."""
+        return self._call_llm(prompt)
+
+    # ── STEP 4: Counterfactual / what-if explanation ──────────────────
+    def explain_counterfactual(self, issue_id: str, diff: dict) -> dict:
+        """
+        Explains what would happen if issue_id were resolved.
+        Called by GraphReasoningAgent.simulate_resolution(). (Step 4)
+        """
+        improved = [
+            f"  - {iid}: {d['before']:.2f} → {d['after']:.2f} (Δ {d['delta']:.2f})"
+            for iid, d in diff.items()
+            if d.get("delta", 0) > 0.05
+        ]
+        unchanged = sum(1 for d in diff.values() if d.get("delta", 0) <= 0.05)
+
+        prompt = f"""You are analyzing a what-if simulation in a project dependency graph.
+
+Scenario: Issue {issue_id} was resolved.
+
+Risk changes in downstream nodes (before → after):
+{chr(10).join(improved) if improved else "  No significant downstream risk reduction."}
+Unchanged nodes: {unchanged}
+
+Tasks:
+1. Explain WHY risk decreased in those downstream nodes (trace the dependency relationship)
+2. Identify which downstream nodes benefited most
+3. Summarize the overall impact of resolving {issue_id}
+
+Rules:
+- Use issue IDs explicitly
+- Base reasoning ONLY on the dependency relationships shown
+- Keep it short and analytical (under 200 words)
+
+Respond with a JSON object: summary, root_causes (what was unblocked), recommendations, confidence."""
         return self._call_llm(prompt)
 
     def _call_llm(self, user_prompt: str) -> dict:
-        """Call Groq API and return parsed JSON."""
+        """Call Groq API with the graph-aware system prompt prepended."""
         import traceback as _tb
         try:
             client = self._get_client()
             response = client.chat.completions.create(
-                model       = self.model_name,
-                messages    = [
+                model    = self.model_name,
+                messages = [
                     {"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user",   "content": user_prompt},
                 ],
-                temperature = 0.2,
-                max_tokens  = 800,
-                response_format = {"type": "json_object"},  # forces clean JSON
+                temperature     = 0.2,
+                max_tokens      = 800,
+                response_format = {"type": "json_object"},
             )
             raw = response.choices[0].message.content.strip()
-
-            # Strip markdown fences just in case
             if raw.startswith("```"):
                 raw = re.sub(r"^```(?:json)?\n?", "", raw)
                 raw = re.sub(r"\n?```$", "", raw)
-
             return json.loads(raw)
-
         except Exception as e:
             log.error("DecisionAgent LLM call failed: %s\n%s", e, _tb.format_exc())
             return {
@@ -651,14 +617,14 @@ class CriticAgent:
 class AgentPipeline:
     """
     Top-level orchestrator.
-    Observe → Analyze → Plan → Act (LLM) → Evaluate → Return
+    Observe → RAG filter → Analyze → Plan → Act (LLM) → Evaluate → Return
     """
 
     def __init__(self, db, openai_api_key: str, poll_interval: int = 30):
         self.perception = PerceptionAgent(db)
         self.reasoning  = GraphReasoningAgent(self.perception)
         self.planning   = PlanningAgent()
-        self.decision   = DecisionAgent(api_key=openai_api_key)  # api_key now holds Gemini key
+        self.decision   = DecisionAgent(api_key=openai_api_key)
         self.monitoring = MonitoringAgent(self.perception, self.reasoning, poll_interval)
         self.critic     = CriticAgent()
 
@@ -668,14 +634,44 @@ class AgentPipeline:
     def stop_monitoring(self):
         self.monitoring.stop()
 
+    # ── STEP 3: Lightweight RAG — keyword-filtered context ────────────
+    def get_relevant_context(
+        self,
+        query: str,
+        nodes: list[IssueNode],
+        risk_results: dict,
+    ) -> list[IssueNode]:
+        """
+        Filters the full node list to only those relevant to the query.
+        Avoids dumping the entire graph into the LLM context window.
+        Combines keyword matching with risk score to pick the best nodes.
+        """
+        keywords = [k for k in query.lower().split() if len(k) > 2]
+
+        scored = []
+        for n in nodes:
+            text = (n.issue_id + " " + n.summary).lower()
+            kw_score  = sum(1 for k in keywords if k in text)
+            risk_score = risk_results.get(n.issue_id, None)
+            risk_val   = risk_score.risk_score if risk_score else 0.0
+            is_at_risk = 1 if n.is_at_risk() else 0
+            total = kw_score * 2 + risk_val + is_at_risk
+            if total > 0:
+                scored.append((total, n))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [n for _, n in scored[:10]]
+
     def run_query(self, user_query: str, project: Optional[str] = None) -> dict:
         log.info("AgentPipeline.run_query: %r", user_query)
 
+        # Step 1 — Observe
         nodes     = self.perception.fetch_all_nodes(project)
         edges     = self.perception.fetch_all_edges()
         node_map  = {n.issue_id: n for n in nodes}
         known_ids = set(node_map.keys())
 
+        # Step 2 — Analyse
         specific_id = self._extract_issue_id(user_query, known_ids)
 
         if specific_id:
@@ -693,6 +689,7 @@ class AgentPipeline:
                     "risk_score": 0.0,
                 }
 
+            # Step 3 — Act with structured issue-specific prompt (Step 2 of plan)
             llm_output = self.decision.explain_issue_risk(
                 specific_id, risk_result, chain, issue_plan
             )
@@ -711,31 +708,43 @@ class AgentPipeline:
             }
 
         else:
-            # Route different query types to different analyses
-            query_lower = user_query.lower()
-            top_risks   = self.reasoning.top_risky_issues(k=10, project=project)
-            risk_results = {r.issue_id: r for r in top_risks}
-            plan        = self.planning.create_mitigation_plan(risk_results, node_map)
+            # General query — use RAG + query-routing
+            risk_results = self.reasoning.global_risk_analysis(project)
+            top_risks    = self.reasoning.top_risky_issues(k=10, project=project)
+            plan         = self.planning.create_mitigation_plan(
+                {r.issue_id: r for r in top_risks}, node_map
+            )
 
-            # Build a query-aware prompt so Groq gives different answers
+            # STEP 3: RAG filter — only send relevant context to LLM
+            relevant_nodes = self.get_relevant_context(user_query, nodes, risk_results)
+            log.info("RAG: filtered to %d relevant nodes from %d total", len(relevant_nodes), len(nodes))
+
+            # Route to appropriate focused prompt based on query intent
+            query_lower = user_query.lower()
+
             if any(w in query_lower for w in ["block", "blocked", "blocking"]):
-                focus = "Focus specifically on blocked issues and what is blocking them."
-                subset = [r for r in top_risks if r.status == "Blocked"][:5] or top_risks[:5]
-            elif any(w in query_lower for w in ["delay", "overdue", "late", "behind"]):
-                focus = "Focus specifically on overdue issues and their delay severity."
-                subset = [r for r in top_risks if (r.delay_days or 0) > 0][:5] or top_risks[:5]
-            elif any(w in query_lower for w in ["root", "cause", "origin", "source"]):
-                focus = "Focus on root cause issues — the origin nodes that are causing cascading risk."
-                subset = [r for r in top_risks if r.is_origin][:5] or top_risks[:5]
-            elif any(w in query_lower for w in ["fix", "solve", "mitigate", "action", "recommend"]):
-                focus = "Focus on actionable recommendations — what should be done first and why."
-                subset = top_risks[:5]
-            elif any(w in query_lower for w in ["summary", "overview", "status", "state"]):
-                focus = "Give a high-level executive summary of the current project risk state."
-                subset = top_risks[:8]
+                focus     = "Focus on blocked issues and what is blocking them. Trace the blocking chain."
+                subset    = [r for r in top_risks if r.status == "Blocked"][:6] or top_risks[:5]
+            elif any(w in query_lower for w in ["delay", "overdue", "late", "behind", "miss"]):
+                focus     = "Focus on overdue issues and their delay severity. Prioritise by days overdue."
+                subset    = [r for r in top_risks if (r.delay_days or 0) > 0][:6] or top_risks[:5]
+            elif any(w in query_lower for w in ["root", "cause", "origin", "source", "why"]):
+                focus     = "Focus on root cause issues (is_root_cause=True) causing cascading risk."
+                subset    = [r for r in top_risks if r.is_origin][:6] or top_risks[:5]
+            elif any(w in query_lower for w in ["fix", "solve", "mitigate", "action", "recommend", "should"]):
+                focus     = "Focus on actionable recommendations. Rank by downstream impact."
+                subset    = top_risks[:6]
+            elif any(w in query_lower for w in ["summary", "overview", "status", "state", "report"]):
+                focus     = "Give an executive summary of the current project risk state across all issues."
+                subset    = top_risks[:8]
+            elif any(w in query_lower for w in ["high", "critical", "urgent", "most"]):
+                focus     = "Focus on the highest risk issues and explain why they are critical."
+                subset    = [r for r in top_risks if r.risk_level == "High"][:6] or top_risks[:5]
             else:
-                focus = f'The user asked: "{user_query}". Answer this question specifically using the data.'
-                subset = top_risks[:8]
+                focus     = f'Answer this specific question: "{user_query}". Use the dependency graph data to give a precise answer.'
+                # Use RAG-filtered nodes to build focused subset
+                rag_ids   = {n.issue_id for n in relevant_nodes}
+                subset    = [r for r in top_risks if r.issue_id in rag_ids] or top_risks[:6]
 
             llm_output = self.decision.summarise_project_risks_focused(subset, plan, focus)
             validated  = self.critic.validate(llm_output, None, known_ids)
@@ -751,28 +760,28 @@ class AgentPipeline:
                     }
                     for r in top_risks
                 ],
-                "action_plan":  plan,
-                "llm_analysis": validated,
+                "action_plan":      plan,
+                "llm_analysis":     validated,
+                "rag_context_size": len(relevant_nodes),
             }
 
     def get_alerts(self) -> list[dict]:
         return self.monitoring.get_alerts(clear=True)
 
     @staticmethod
-    @staticmethod
     def _extract_issue_id(query: str, known_ids: set[str]) -> Optional[str]:
-        # Match explicit Jira IDs like HADOOP-42
+        # Exact Jira-style match: HADOOP-42
         matches = re.findall(r'\b([A-Z]+-\d+)\b', query)
         for m in matches:
             if m in known_ids:
                 return m
-        # Match partial like "HADOOP 8", "hadoop-8", "task 8"
+        # Case-insensitive full match
         query_upper = query.upper()
         for iid in known_ids:
             if iid in query_upper:
                 return iid
-        # Match number-only mentions like "issue 8" or "task 8"
-        num_match = re.search(r'\b(?:issue|task|ticket|item)\s+(\d+)\b', query, re.IGNORECASE)
+        # Natural language: "issue 8", "task 42", "ticket 16"
+        num_match = re.search(r'\b(?:issue|task|ticket|item|bug)\s+(\d+)\b', query, re.IGNORECASE)
         if num_match:
             num = num_match.group(1)
             for iid in known_ids:
