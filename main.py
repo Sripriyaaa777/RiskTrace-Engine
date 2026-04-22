@@ -117,6 +117,10 @@ class QueryRequest(BaseModel):
     project: Optional[str] = None
 
 
+class CounterfactualRequest(BaseModel):
+    resolve_as: Optional[str] = "Done"
+
+
 def require_pipeline():
     if _pipeline is None:
         raise HTTPException(
@@ -277,4 +281,23 @@ def get_dashboard(project: Optional[str] = Query(None)):
         }
     except Exception as e:
         log.exception("Dashboard failed")
+        raise HTTPException(500, str(e))
+
+
+@app.post("/counterfactual/{issue_id}", tags=["counterfactual"])
+def counterfactual(issue_id: str, req: CounterfactualRequest = CounterfactualRequest()):
+    """
+    Counterfactual reasoning: simulate resolving an issue and show
+    before/after risk scores for all downstream nodes.
+    No DB writes — pure in-memory clone + propagation.
+    """
+    pipeline = require_pipeline()
+    try:
+        result = pipeline.reasoning.counterfactual_resolve(
+            issue_id   = issue_id.upper(),
+            resolve_as = req.resolve_as or "Done",
+        )
+        return {"status": "ok", "data": result}
+    except Exception as e:
+        log.exception("Counterfactual analysis failed")
         raise HTTPException(500, str(e))

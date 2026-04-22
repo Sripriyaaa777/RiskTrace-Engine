@@ -1,208 +1,270 @@
-# RiskTrace-Engine
-# IssueGraphAgent++
+
+# IssueGraphAgent++ 🔍
 
 > A Multi-Agent Generative AI Framework for Proactive Risk Propagation  
 > over Temporal Dependency Graphs in Software Project Management
+
+**Proactive risk propagation and counterfactual reasoning over software project dependency graphs.**
+
+RiskTrace Engine ingests issue-tracker data (JIRA-style tickets), builds a temporal dependency graph, and continuously propagates risk scores from delayed or blocked tasks downstream — alerting teams *before* cascades become critical.
+
+The centerpiece novel contribution is **Counterfactual What-If Analysis**: a manager can hypothetically resolve any issue and instantly see how downstream risk scores change, enabling principled prioritisation decisions backed by quantitative impact estimates.
+
+---
+
+## Key Features
+
+- **Multi-hop temporal risk propagation** — Risk decays with graph distance (γ = 0.8 per hop) and issue staleness, producing a principled score in [0, 1] for every node
+- **Counterfactual reasoning** — In-memory graph clone + re-propagation; no database writes. Shows before/after risk scores and a visual graph diff
+- **Multi-agent pipeline** — Six agents: Perception, Graph Reasoning, Planning, Decision (LLM), Monitoring, Critic
+- **Two backend modes** — CSV mode (no Neo4j needed) or full Neo4j mode; switch with one env variable
+- **Dark-themed dashboard UI** — Risk board, action plan, alerts, and What-If tab; pure HTML, no build step
+
+---
+
+## How It Works
+
+```
+Issues CSV + Dependencies CSV  (or Neo4j graph)
+          │
+          ▼
+    PerceptionAgent          fetches nodes + edges
+          │
+          ▼
+  GraphReasoningAgent        runs RiskPropagationEngine
+          │
+          ▼
+   RiskPropagationEngine     R(v) = Σ [ severity × γ^depth × temporal_weight ]
+          │
+          ├──▶ PlanningAgent      ranked mitigation plan
+          ├──▶ DecisionAgent      LLM explanation (optional)
+          ├──▶ MonitoringAgent    background watcher, proactive alerts
+          └──▶ CriticAgent        validates LLM outputs
+
+What-If:
+  Manager selects issue → POST /counterfactual/{id}
+  → clone graph in memory → patch node to Done → re-propagate
+  → return before/after diff + graph_nodes for visual rendering
+```
+
+**Risk Score Formula:**
+```
+R(v) = Σ [ delay_severity(u) × γ^(depth-1) × temporal_weight(u) ]
+       for each upstream risky ancestor u at depth d
+
+delay_severity = min(delay_days / 30, 1.0)   for delayed nodes
+               = 1.0                          for blocked nodes
+γ (depth decay) = 0.80
+temporal_weight = 0.5 + 0.5 × e^(−age_days / 30)
+```
 
 ---
 
 ## Project Structure
 
 ```
-issuegraphagent/
-├── scripts/
-│   ├── preprocess.py       Phase 1 — Data ingestion & normalisation
-│   └── build_graph.py      Phase 2 — Neo4j graph construction
-├── core/
-│   └── risk_engine.py      Phase 2 — Temporal risk propagation algorithm
-├── agents/
-│   └── agents.py           Phase 3 — All 6 agents + AgentPipeline
-├── api/
-│   └── main.py             Phase 4 — FastAPI REST backend
-├── evaluation/
-│   └── evaluate.py         Phase 4 — Benchmark evaluation framework
-├── data/
-│   ├── raw/                Put downloaded dataset here
-│   └── processed/          Auto-generated CSVs go here
-├── requirements.txt
-└── .env.example
+RiskTrace-Engine-main/
+├── main.py            FastAPI app — all routes including /counterfactual
+├── agents.py          All six agents + AgentPipeline orchestrator
+├── risk_engine.py     Core propagation algorithm (Neo4j-agnostic)
+├── csv_db.py          In-memory CSV graph DB (drop-in Neo4j replacement)
+├── build_graph.py     Neo4j graph builder (used in Neo4j mode)
+├── preprocess.py      Synthetic data generator
+├── evaluate.py        Evaluation + benchmarking utilities
+├── issuegraph_ui.html Single-file dashboard (open directly in browser)
+└── requirements.txt   Python dependencies
 ```
 
 ---
 
-## Quickstart (step by step)
+## Quickstart — Mode A: CSV (No Neo4j Required)
 
-### Step 1 — Install dependencies
+This is the recommended way to get started. Everything runs locally with no database setup.
 
+### 1. Clone the repository
+```bash
+git clone https://github.com/YOUR_USERNAME/RiskTrace-Engine.git
+cd RiskTrace-Engine-main
+```
+
+### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 2 — Set up environment variables
+### 3. Create your `.env` file
+Create a file named `.env` in the project root:
+```env
+USE_NEO4J=false
+MONITOR_INTERVAL=60
 
-Copy `.env.example` to `.env` and fill in your keys:
+# Optional — add for LLM explanations in the dashboard
+# GROQ_API_KEY=your_groq_key_here
+```
 
+### 4. Generate synthetic data
 ```bash
-cp .env.example .env
+python preprocess.py --synthetic
+```
+This creates `data/processed/issues.csv` and `data/processed/dependencies.csv` — around 200 synthetic issues with realistic dependency chains, delays, and blocked tasks.
+
+### 5. Start the API server
+```bash
+uvicorn main:app --reload --port 8000
+```
+Expected output:
+```
+✓ Running in CSV mode
+IssueGraphAgent++ ready  [mode: csv]
 ```
 
+### 6. Open the dashboard
+Open `issuegraph_ui.html` directly in your browser (double-click the file or drag it into your browser). When prompted for the API URL, enter:
 ```
-OPENAI_API_KEY=sk-...
+http://localhost:8000
+```
+
+---
+
+## Quickstart — Mode B: Neo4j
+
+Use this mode if you want a real graph database backend, or when working with actual JIRA data exports.
+
+### 1. Install Neo4j Desktop
+Download and install from [neo4j.com/download](https://neo4j.com/download).
+- Open Neo4j Desktop → Create a new Project → Add a Database → Start it
+- Set a password when prompted (you'll use this in `.env`)
+
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Create your `.env` file
+```env
+USE_NEO4J=true
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=issuegraph123
+NEO4J_PASSWORD=your_neo4j_password_here
 MONITOR_INTERVAL=60
+
+# Optional — add for LLM explanations
+# GROQ_API_KEY=your_groq_key_here
 ```
 
-### Step 3 — Start Neo4j (Docker, no installation needed)
-
+### 4. Generate synthetic data and load into Neo4j
 ```bash
-docker run -d \
-  --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/issuegraph123 \
-  neo4j:5.18-community
+# First generate the CSV data
+python preprocess.py --synthetic
+
+# Then load it into Neo4j (creates Issue nodes + DEPENDS_ON relationships)
+python build_graph.py
 ```
 
-Neo4j Browser will be available at http://localhost:7474  
-Use credentials: `neo4j` / `issuegraph123`
-
-### Step 4 — Download the Apache Jira Dataset
-
-Download from: https://zenodo.org/records/7740379  
-Place the JSON/CSV file in `data/raw/`.
-
-### Step 5 — Preprocess the dataset
-
-**Option A — Real dataset:**
+### 5. Start the API server
 ```bash
-python scripts/preprocess.py \
-    --input data/raw/issues.json \
-    --max-issues 300 \
-    --project HADOOP \
-    --output data/processed
+uvicorn main:app --reload --port 8000
+```
+Expected output:
+```
+✓ Connected to Neo4j
+IssueGraphAgent++ ready  [mode: neo4j]
 ```
 
-**Option B — Synthetic dataset (for testing without downloading):**
+> **Note:** If Neo4j is not reachable at startup, the server automatically falls back to CSV mode with a warning. This means the server will never crash due to a database connection issue.
+
+### 6. Open the dashboard
+Open `issuegraph_ui.html` in your browser and enter `http://localhost:8000` as the API URL.
+
+---
+
+## Switching Between Modes
+
+Switching is a one-line change in `.env`:
+
+```env
+# CSV mode (no Neo4j)
+USE_NEO4J=false
+
+# Neo4j mode
+USE_NEO4J=true
+```
+
+All agents, the risk engine, and the What-If counterfactual feature work **identically in both modes**. The only difference is where the graph data comes from.
+
+---
+
+## API Endpoints
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/health` | Server status and active DB mode |
+| GET | `/dashboard` | Full dashboard: summary + top risks + action plan |
+| GET | `/risk/{issue_id}` | Risk score + explanation for one issue |
+| GET | `/graph/{issue_id}` | Dependency chain as nodes + edges |
+| GET | `/alerts` | Proactive monitoring alerts |
+| POST | `/query` | Natural language query to AI agent |
+| POST | `/counterfactual/{issue_id}` | **What-If simulation** — before/after risk diff |
+
+Interactive API docs (Swagger UI) available at:
+```
+http://localhost:8000/docs
+```
+
+### Counterfactual endpoint example
 ```bash
-python scripts/preprocess.py --synthetic --max-issues 200
-```
-
-This produces:
-- `data/processed/issues.csv`       — normalised issue nodes
-- `data/processed/dependencies.csv` — dependency edges
-- `data/processed/stats.json`       — dataset statistics for the paper
-
-### Step 6 — Build the graph in Neo4j
-
-```bash
-python scripts/build_graph.py \
-    --issues   data/processed/issues.csv \
-    --deps     data/processed/dependencies.csv
-```
-
-Verify by opening http://localhost:7474 and running:
-```cypher
-MATCH (n:Issue) RETURN count(n)
-MATCH ()-[r:DEPENDS_ON]->() RETURN count(r)
-```
-
-### Step 7 — Start the API
-
-```bash
-cd issuegraphagent
-uvicorn api.main:app --reload --port 8000
-```
-
-API docs available at: http://localhost:8000/docs
-
-### Step 8 — Test the system
-
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Natural language query
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:8000/counterfactual/HADOOP-121 \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the riskiest tasks?"}'
-
-# Issue-specific risk
-curl http://localhost:8000/risk/HADOOP-42
-
-# Dependency graph for an issue
-curl http://localhost:8000/graph/HADOOP-42
-
-# Dashboard data
-curl http://localhost:8000/dashboard
-
-# Proactive alerts
-curl http://localhost:8000/alerts
+  -d '{"resolve_as": "Done"}'
 ```
 
-### Step 9 — Run the evaluation (for paper)
-
-```bash
-python evaluation/evaluate.py \
-    --n-queries 60 \
-    --output evaluation/results.json
-```
-
-This auto-generates benchmark queries from the graph, runs all three
-systems (ours, keyword baseline, Cypher baseline), computes metrics,
-and prints a summary table for Table 2 in the paper.
+Response includes:
+- `impact_summary` — nodes improved, high-risk reduction, estimated delay-days saved
+- `diff[]` — per-node before/after risk scores sorted by most improved
+- `graph_nodes[]` + `graph_edges[]` — full graph state for visual rendering
 
 ---
 
-## Architecture
+## What-If Analysis (Counterfactual Reasoning)
 
-```
-Dataset (Apache Jira)
-        ↓
-Perception Agent        → Ingests graph state from Neo4j
-        ↓
-Graph Reasoning Agent   → Multi-hop traversal + risk propagation
-        ↓                 (core algorithm: temporal decay formula)
-Planning Agent          → Decomposes mitigation goals
-        ↓
-Decision Agent (GPT-4o) → Natural language explanation + recommendations
-        ↓
-Critic Agent            → Validates LLM output, strips hallucinations
-        ↓
-FastAPI / Next.js       → REST API + Frontend
+This is the novel research contribution of this project. To use it:
 
-Monitoring Agent        → Background thread, continuous proactive alerts
-```
+1. Open the dashboard and click **What-If** in the left sidebar
+2. Type any issue ID (e.g. `HADOOP-121`, `KAFKA-23`, `HADOOP-16`)
+3. Click **Run Simulation** or press Enter
 
-## Risk Score Formula
+The system will:
+- Clone the current dependency graph entirely in memory (zero DB writes)
+- Mark the selected issue as resolved (Done, delay = 0)
+- Rerun the full temporal risk propagation algorithm on the clone
+- Display a **side-by-side graph diff** (BEFORE / AFTER) with colour-coded nodes
+- Show impact cards: nodes improved, high-risk reduction, delay-days saved
+- List every node whose risk score changed, sorted by biggest improvement
 
-```
-R(v) = Σ [ delay_severity(u) × depth_weight(d) × temporal_weight(u) ]
+**Why it's novel:** Counterfactual reasoning has not previously been applied to software project dependency graphs. The simulation uses the same temporal decay formula as the live engine, making the estimates principled rather than heuristic. This is formally equivalent to interventional reasoning in causal inference literature.
 
-Where:
-  delay_severity(u)  = min(delay_days / 30, 1.0)     for delayed nodes
-                       1.0                             for blocked nodes
-  depth_weight(d)    = 0.8^(d-1)                     attenuates with hops
-  temporal_weight(u) = 0.5 + 0.5 × e^(-age_days/30)  recent = fresher signal
-
-Thresholds: High ≥ 0.70 · Medium ≥ 0.35 · Low < 0.35
-```
+**Good issues to test with synthetic data:**
+- `HADOOP-121` — direct blocker of the KAFKA-23 chain
+- `HADOOP-16` — blocked, cascades into 7+ high-risk downstream nodes
+- `KAFKA-33` — blocked, feeds SPARK-34 → SPARK-35 → HADOOP-36 chain
+- `KAFKA-23` — high centrality node; resolving it affects a large portion of the graph
 
 ---
 
-## For the Paper
+## Optional: LLM Explanations
 
-Key files to reference in your implementation section:
-- `core/risk_engine.py`     — Algorithm 1 (risk propagation)
-- `agents/agents.py`        — Figure 2 (agent pipeline)
-- `evaluation/evaluate.py`  — Section 9 (evaluation framework)
-- `data/processed/stats.json` — Table 1 (dataset statistics)
-- `evaluation/results.json` — Table 2 (experimental results)
+Add a Groq API key to `.env` to enable natural language explanations:
 
+```env
+GROQ_API_KEY=your_groq_key_here
+```
 
-## Commands to execute
+This powers:
+- The **LLM Analysis** panel in the dashboard (root cause summary + recommendations)
+- The **AI Agent chat** (ask natural language questions about your project)
 
-- first : python scripts/preprocess.py --synthetic [for generating the preprocessed synthetic dataset]
-- second : python -m uvicorn api.main:app --reload --port 8000
-- third : (preferably in another window shell after running the second) :  Invoke-RestMethod -Uri "http://127.0.0.1:8000/query" -Method POST -ContentType "application/json" -Body '{"query": "What are the riskiest tasks?"}' | ConvertTo-Json -Depth 10
+The risk engine, What-If feature, and all other functionality work fully without it.
 
+Get a free Groq API key at [console.groq.com](https://console.groq.com).
+
+---

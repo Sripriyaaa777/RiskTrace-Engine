@@ -362,6 +362,10 @@
       Alerts
       <span id="alert-badge" style="display:none;background:var(--danger);color:#fff;font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;margin-left:auto;"></span>
     </div>
+    <div class="nav-item" onclick="showTab('whatif')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      What-If
+    </div>
     <div class="nav-section-label">Tools</div>
     <div class="nav-item" onclick="refreshDashboard()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -481,6 +485,74 @@
         <div class="empty-state">Click "Fetch Alerts" to load monitoring alerts.</div>
       </div>
     </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         WHAT-IF / COUNTERFACTUAL ANALYSIS TAB
+         ══════════════════════════════════════════════════════════ -->
+    <div id="tab-whatif" style="display:none">
+      <div style="max-width:960px">
+
+        <div style="margin-bottom:22px">
+          <h2 style="font-family:var(--display);font-size:19px;font-weight:700;margin-bottom:6px">Counterfactual What-If Analysis</h2>
+          <p style="color:var(--sub);font-size:13px;line-height:1.6">Hypothetically resolve any issue and see how downstream risk scores change — without touching the database. Uses the same temporal propagation engine as the live risk board.</p>
+        </div>
+
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+          <label style="font-family:var(--mono);font-size:10px;color:var(--muted);display:block;margin-bottom:10px;letter-spacing:.08em">ISSUE ID TO HYPOTHETICALLY RESOLVE</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input id="cf-input" type="text" placeholder="e.g. KAFKA-48"
+              style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none"
+              onkeydown="if(event.key==='Enter')runCounterfactual()"/>
+            <button onclick="runCounterfactual()" id="cf-run-btn"
+              style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px 22px;font-family:var(--mono);font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap">
+              &#9654; Run Simulation
+            </button>
+          </div>
+          <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted)">Tip: type any issue ID from the Risk Board and hit Enter to simulate its resolution.</div>
+        </div>
+
+        <div id="cf-spinner" style="display:none;text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted)">&#9203; Running propagation simulation&#8230;</div>
+
+        <div id="cf-result" style="display:none">
+          <div id="cf-banner" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-family:var(--mono);font-size:12px;color:var(--accent)"></div>
+          <div id="cf-impact-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px"></div>
+
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px;letter-spacing:.08em;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+              GRAPH DIFF &mdash; DEPENDENCY RISK VISUALISATION
+              <span style="display:flex;align-items:center;gap:5px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#f75e5e;display:inline-block"></span>High</span>
+              <span style="display:flex;align-items:center;gap:5px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#f7c35e;display:inline-block"></span>Medium</span>
+              <span style="display:flex;align-items:center;gap:5px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#5ef7a0;display:inline-block"></span>Low</span>
+              <span style="display:flex;align-items:center;gap:5px;color:var(--accent)"><span style="width:12px;height:12px;border-radius:50%;background:#4f8ef7;border:2px solid #fff;display:inline-block"></span>Resolved</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--danger);margin-bottom:8px;text-align:center;letter-spacing:.06em">&#9679; BEFORE</div>
+                <canvas id="cf-canvas-before" width="420" height="340" style="width:100%;border-radius:8px;background:var(--surface);display:block"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--success);margin-bottom:8px;text-align:center;letter-spacing:.06em">&#9679; AFTER (hypothetical)</div>
+                <canvas id="cf-canvas-after" width="420" height="340" style="width:100%;border-radius:8px;background:var(--surface);display:block"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+            <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.08em;display:flex;justify-content:space-between;align-items:center">
+              NODE-LEVEL RISK DELTA
+              <span id="cf-diff-count" style="color:var(--accent)"></span>
+            </div>
+            <table class="risk-table">
+              <thead><tr>
+                <th>Issue</th><th>Summary</th><th>Before</th><th>After</th><th>&Delta; Score</th>
+              </tr></thead>
+              <tbody id="cf-diff-body"></tbody>
+            </table>
+            <div id="cf-diff-empty" style="display:none;padding:28px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No downstream nodes changed — this issue may not be a propagation origin.</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-whatif -->
 
   </div>
 </div>
@@ -819,8 +891,8 @@ function addThinking() {
 }
 
 // ── Tabs ──
-const tabs = ['dashboard','risks','plan','alerts'];
-const tabTitles = { dashboard: 'Dashboard', risks: 'Risk Board', plan: 'Action Plan', alerts: 'Monitoring Alerts' };
+const tabs = ['dashboard','risks','plan','alerts','whatif'];
+const tabTitles = { dashboard: 'Dashboard', risks: 'Risk Board', plan: 'Action Plan', alerts: 'Monitoring Alerts', whatif: 'What-If Analysis' };
 function showTab(name) {
   tabs.forEach(t => {
     document.getElementById(`tab-${t}`).style.display = t === name ? '' : 'none';
@@ -856,6 +928,237 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('status-label').textContent = 'Not connected';
   }
 });
+
+// ── What-If / Counterfactual Analysis ────────────────────────────────────────
+
+async function runCounterfactual() {
+  const id = (document.getElementById('cf-input').value || '').trim().toUpperCase();
+  if (!id) { showError('Enter an issue ID first.'); return; }
+  if (!API_BASE) { openConfig(); return; }
+
+  document.getElementById('cf-result').style.display = 'none';
+  document.getElementById('cf-spinner').style.display = '';
+  document.getElementById('cf-run-btn').disabled = true;
+
+  try {
+    const r = await fetch(`${API_BASE}/counterfactual/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolve_as: 'Done' })
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.detail || 'Request failed');
+    renderCounterfactual(json.data);
+  } catch(e) {
+    showError('What-If simulation failed: ' + e.message);
+  } finally {
+    document.getElementById('cf-spinner').style.display = 'none';
+    document.getElementById('cf-run-btn').disabled = false;
+  }
+}
+
+function renderCounterfactual(data) {
+  // Banner
+  const imp = data.impact_summary;
+  document.getElementById('cf-banner').textContent =
+    `\u2713 Simulating resolution of ${data.issue_id}: "${data.summary}" ` +
+    `\u2014 ${imp.nodes_improved} nodes would improve, ` +
+    `saving an estimated ${imp.total_delay_days_saved} combined delay-days.`;
+
+  // Impact cards
+  const cards = [
+    { label: 'Nodes Improved',      val: imp.nodes_improved,         color: 'var(--success)' },
+    { label: 'High Risk Reduced',   val: imp.high_risk_reduction,    color: 'var(--danger)'  },
+    { label: 'Delay-Days Saved',    val: imp.total_delay_days_saved, color: 'var(--warning)' },
+    { label: 'Nodes Worsened',      val: imp.nodes_worsened,         color: 'var(--muted)'   },
+  ];
+  document.getElementById('cf-impact-cards').innerHTML = cards.map(c => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px">
+      <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:${c.color}">${c.val}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;letter-spacing:.05em">${c.label}</div>
+    </div>`).join('');
+
+  // Graph diff
+  renderCFGraph('cf-canvas-before', data.graph_nodes, data.graph_edges, 'before', data.issue_id);
+  renderCFGraph('cf-canvas-after',  data.graph_nodes, data.graph_edges, 'after',  data.issue_id);
+
+  // Diff table
+  const tbody = document.getElementById('cf-diff-body');
+  const empty = document.getElementById('cf-diff-empty');
+  document.getElementById('cf-diff-count').textContent = data.diff.length + ' nodes changed';
+
+  if (data.diff.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = '';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = data.diff.map(d => {
+      const improved = d.delta < 0;
+      const arrow    = improved ? '\u25bc' : '\u25b2';
+      const aColor   = improved ? 'var(--success)' : 'var(--danger)';
+      const blvl     = d.before_level.toLowerCase();
+      const alvl     = d.after_level.toLowerCase();
+      const badgeStyle = (lvl) => {
+        const c = lvl==='high'?'var(--danger)':lvl==='medium'?'var(--warning)':'var(--success)';
+        return `style="background:${c}22;color:${c};font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid ${c}44"`;
+      };
+      return `<tr>
+        <td><span style="font-family:var(--mono);font-size:12px">${d.issue_id}</span></td>
+        <td style="color:var(--sub);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(d.summary||'').slice(0,55)}</td>
+        <td><span ${badgeStyle(blvl)}>${d.before_level} &nbsp;${d.before_score.toFixed(2)}</span></td>
+        <td><span ${badgeStyle(alvl)}>${d.after_level} &nbsp;${d.after_score.toFixed(2)}</span></td>
+        <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:${aColor}">${arrow} ${Math.abs(d.delta).toFixed(3)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('cf-result').style.display = '';
+}
+
+function renderCFGraph(canvasId, graphNodes, graphEdges, mode, resolvedId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Cap nodes for perf; always include the resolved node first
+  const MAX = 35;
+  let nodes = graphNodes.filter(n => n.id === resolvedId);
+  const rest = graphNodes.filter(n => n.id !== resolvedId).slice(0, MAX - 1);
+  nodes = nodes.concat(rest);
+
+  // Build id set for edge filtering
+  const idSet = new Set(nodes.map(n => n.id));
+  const edges = graphEdges.filter(e => idSet.has(e.source) && idSet.has(e.target));
+
+  // Initial positions — circle layout
+  const pos = {};
+  nodes.forEach((n, i) => {
+    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+    pos[n.id] = {
+      x: W / 2 + (W * 0.38) * Math.cos(angle),
+      y: H / 2 + (H * 0.38) * Math.sin(angle),
+      vx: 0, vy: 0
+    };
+  });
+
+  // Force-directed relaxation (80 iterations)
+  for (let iter = 0; iter < 80; iter++) {
+    const f = {};
+    nodes.forEach(n => { f[n.id] = { x: 0, y: 0 }; });
+
+    // Repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i].id, b = nodes[j].id;
+        let dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+        const ff = 1200 / (d * d);
+        f[a].x += dx / d * ff; f[a].y += dy / d * ff;
+        f[b].x -= dx / d * ff; f[b].y -= dy / d * ff;
+      }
+    }
+
+    // Attraction
+    edges.forEach(e => {
+      if (!pos[e.source] || !pos[e.target]) return;
+      const dx = pos[e.target].x - pos[e.source].x;
+      const dy = pos[e.target].y - pos[e.source].y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      const ff = d * 0.018;
+      f[e.source].x += dx / d * ff; f[e.source].y += dy / d * ff;
+      f[e.target].x -= dx / d * ff; f[e.target].y -= dy / d * ff;
+    });
+
+    // Gravity to centre
+    nodes.forEach(n => {
+      f[n.id].x += (W / 2 - pos[n.id].x) * 0.012;
+      f[n.id].y += (H / 2 - pos[n.id].y) * 0.012;
+    });
+
+    nodes.forEach(n => {
+      pos[n.id].x = Math.max(20, Math.min(W - 20, pos[n.id].x + f[n.id].x * 0.5));
+      pos[n.id].y = Math.max(20, Math.min(H - 20, pos[n.id].y + f[n.id].y * 0.5));
+    });
+  }
+
+  // Draw edges
+  ctx.lineWidth = 1;
+  edges.forEach(e => {
+    if (!pos[e.source] || !pos[e.target]) return;
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(90,100,120,0.35)';
+    ctx.moveTo(pos[e.source].x, pos[e.source].y);
+    ctx.lineTo(pos[e.target].x, pos[e.target].y);
+    ctx.stroke();
+    // Arrow head
+    const dx = pos[e.target].x - pos[e.source].x;
+    const dy = pos[e.target].y - pos[e.source].y;
+    const d  = Math.sqrt(dx * dx + dy * dy) || 1;
+    const tx = pos[e.target].x - dx / d * 10;
+    const ty = pos[e.target].y - dy / d * 10;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(90,100,120,0.5)';
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - dy/d*4 - dx/d*6, ty + dx/d*4 - dy/d*6);
+    ctx.lineTo(tx + dy/d*4 - dx/d*6, ty - dx/d*4 - dy/d*6);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const p   = pos[n.id];
+    const lvl = mode === 'before' ? n.before_level : n.after_level;
+    const isResolved = n.id === resolvedId && mode === 'after';
+    const r   = isResolved ? 13 : 8;
+
+    let fill;
+    if (isResolved)        fill = '#4f8ef7';
+    else if (lvl === 'High')   fill = '#f75e5e';
+    else if (lvl === 'Medium') fill = '#f7c35e';
+    else if (lvl === 'Low')    fill = '#5ef7a0';
+    else fill = '#5a6478';
+
+    // Glow for high-risk
+    if (lvl === 'High' || isResolved) {
+      ctx.beginPath();
+      const grad = ctx.createRadialGradient(p.x, p.y, r*0.5, p.x, p.y, r*2.5);
+      grad.addColorStop(0, fill + '55');
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.arc(p.x, p.y, r * 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+    ctx.fillStyle = fill;
+    ctx.fill();
+
+    if (isResolved || n.id === resolvedId) {
+      ctx.strokeStyle = '#ffffff88';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    // Label
+    ctx.fillStyle = 'rgba(226,232,240,0.82)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    const lbl = n.id.length > 12 ? n.id.slice(0, 11) + '\u2026' : n.id;
+    ctx.fillText(lbl, p.x, p.y + r + 10);
+  });
+}
+
+// Allow prefilling from Risk Board
+function prefillWhatIf(issueId) {
+  document.getElementById('cf-input').value = issueId;
+  showTab('whatif');
+}
+
 </script>
 </body>
 </html>

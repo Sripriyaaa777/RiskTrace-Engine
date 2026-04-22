@@ -79,6 +79,16 @@ class CsvGraphDB:
         params = parameters or {}
         q = query.strip().lower()
 
+        # Pattern: fetch ALL issue nodes including Done (for counterfactual)
+        if "match (n:issue)" in q and "n.status <> 'done'" not in q and "return n {.*}" in q:
+            project = params.get("project")
+            rows = [
+                {"props": dict(v)}
+                for v in self._issues.values()
+                if (not project or v["project"] == project)
+            ]
+            return _ResultSet(rows)
+
         # Pattern: fetch all issue nodes (not Done)
         if "match (n:issue)" in q and "n.status <> 'done'" in q and "return n {.*}" in q:
             project = params.get("project")

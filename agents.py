@@ -92,6 +92,16 @@ class PerceptionAgent:
         log.debug("PerceptionAgent: fetched %d edges", len(edges))
         return edges
 
+    def fetch_all_nodes_including_done(self, project: Optional[str] = None) -> list[IssueNode]:
+        """Fetch ALL nodes including Done — used only by counterfactual to see full graph."""
+        if project:
+            query = "MATCH (n:Issue {project: $project}) RETURN n {.*} AS props"
+            records = self.db.run(query, {"project": project})
+        else:
+            query = "MATCH (n:Issue) RETURN n {.*} AS props"
+            records = self.db.run(query)
+        return [neo4j_record_to_issue_node(r["props"]) for r in records]
+
     def fetch_node(self, issue_id: str) -> Optional[IssueNode]:
         query = "MATCH (n:Issue {issue_id: $issue_id}) RETURN n {.*} AS props"
         record = self.db.run(query, {"issue_id": issue_id}).single()
@@ -174,6 +184,131 @@ class GraphReasoningAgent:
         """
         records = self.perception.db.run(query)
         return [neo4j_record_to_issue_node(r["props"]) for r in records]
+
+    def counterfactual_resolve(
+        self,
+        issue_id: str,
+        resolve_as: str = "Done",
+    ) -> dict:
+        """
+        Counterfactual reasoning: hypothetically resolve `issue_id` and
+        rerun risk propagation on the cloned graph.
+
+        No writes are made to the database — all computation is in-memory.
+        Returns before/after risk scores + a structured diff for every
+        downstream node, enabling Layer 1 (quantitative) and Layer 2
+        (visual graph diff) of the What-If feature.
+        """
+        # ── Fetch real graph state (ALL nodes including Done) ──────
+        nodes = self.perception.fetch_all_nodes_including_done()
+        edges = self.perception.fetch_all_edges()
+
+        # ── BEFORE: propagation on the real graph ──────────────────
+        before_results = run_propagation(nodes, edges, self.config)
+
+        # ── Clone & patch the target node ──────────────────────────
+        cloned_nodes: list[IssueNode] = []
+        for n in nodes:
+            if n.issue_id == issue_id:
+                cloned_nodes.append(IssueNode(
+                    issue_id   = n.issue_id,
+                    project    = n.project,
+                    summary    = n.summary,
+                    status     = resolve_as,   # "Done" removes it from propagation
+                    priority   = n.priority,
+                    assignee   = n.assignee,
+                    due_date   = n.due_date,
+                    updated    = n.updated,
+                    delay_days = 0.0,
+                    is_delayed = False,
+                ))
+            else:
+                cloned_nodes.append(n)
+
+        # ── AFTER: propagation on the patched clone ─────────────────
+        after_results = run_propagation(cloned_nodes, edges, self.config)
+
+        # ── Build the diff ──────────────────────────────────────────
+        all_ids = set(before_results.keys()) | set(after_results.keys())
+        all_ids.discard(issue_id)
+
+        diff = []
+        total_delay_saved = 0.0
+        high_before = high_after = improved = worsened = 0
+
+        for nid in all_ids:
+            b = before_results.get(nid)
+            a = after_results.get(nid)
+            b_score = b.risk_score if b else 0.0
+            a_score = a.risk_score if a else 0.0
+            b_level = b.risk_level if b else "None"
+            a_level = a.risk_level if a else "None"
+            delta   = round(a_score - b_score, 3)
+
+            if b_level == "High":
+                high_before += 1
+            if a_level == "High":
+                high_after  += 1
+
+            if delta < -0.01:
+                improved += 1
+                node_obj = next((n for n in nodes if n.issue_id == nid), None)
+                if node_obj and node_obj.delay_days:
+                    total_delay_saved += abs(delta) * node_obj.delay_days
+            elif delta > 0.01:
+                worsened += 1
+
+            if abs(delta) > 0.005:
+                diff.append({
+                    "issue_id":     nid,
+                    "summary":      (b or a).summary if (b or a) else nid,
+                    "before_score": b_score,
+                    "after_score":  a_score,
+                    "before_level": b_level,
+                    "after_level":  a_level,
+                    "delta":        delta,
+                    "improved":     delta < 0,
+                })
+
+        diff.sort(key=lambda x: x["delta"])  # most-improved first
+
+        resolved_node = next((n for n in nodes if n.issue_id == issue_id), None)
+
+        # Build full node list for graph diff visualisation
+        # Each node gets its before/after state so the UI can draw the diff graph
+        all_node_ids = list({n.issue_id for n in nodes})
+        graph_nodes = []
+        for n in nodes:
+            b = before_results.get(n.issue_id)
+            a = after_results.get(n.issue_id)
+            is_resolved = n.issue_id == issue_id
+            graph_nodes.append({
+                "id":           n.issue_id,
+                "summary":      n.summary[:80],
+                "status":       n.status,
+                "priority":     n.priority,
+                "is_resolved":  is_resolved,
+                "before_score": b.risk_score if b else 0.0,
+                "after_score":  a.risk_score if a else (0.0 if is_resolved else (b.risk_score if b else 0.0)),
+                "before_level": b.risk_level if b else "None",
+                "after_level":  a.risk_level if a else "None",
+            })
+
+        return {
+            "issue_id":    issue_id,
+            "summary":     resolved_node.summary if resolved_node else issue_id,
+            "resolved_as": resolve_as,
+            "diff":        diff,
+            "graph_nodes": graph_nodes,
+            "graph_edges": [{"source": s, "target": t} for s, t in edges],
+            "impact_summary": {
+                "nodes_improved":         improved,
+                "nodes_worsened":         worsened,
+                "nodes_unchanged":        len(all_ids) - improved - worsened,
+                "total_delay_days_saved": round(total_delay_saved, 1),
+                "high_risk_reduction":    max(high_before - high_after, 0),
+            },
+        }
 
 
 # ─────────────────────────────────────────────
