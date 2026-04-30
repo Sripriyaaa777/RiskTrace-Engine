@@ -79,8 +79,13 @@ class CsvGraphDB:
         params = parameters or {}
         q = query.strip().lower()
 
+        # Pattern: count delayed issues
+        if "is_delayed = true" in q and "count(n)" in q:
+            n = sum(1 for v in self._issues.values() if v["is_delayed"])
+            return _ResultSet([{"c": n}])
+
         # Pattern: fetch ALL issue nodes including Done (for counterfactual)
-        if "match (n:issue)" in q and "n.status <> 'done'" not in q and "return n {.*}" in q:
+        if "match (n:issue" in q and "n.status <> 'done'" not in q and "return n {.*}" in q:
             project = params.get("project")
             rows = [
                 {"props": dict(v)}
@@ -90,7 +95,7 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: fetch all issue nodes (not Done)
-        if "match (n:issue)" in q and "n.status <> 'done'" in q and "return n {.*}" in q:
+        if "match (n:issue" in q and "n.status <> 'done'" in q and "return n {.*}" in q:
             project = params.get("project")
             rows = [
                 {"props": dict(v)}
@@ -101,7 +106,7 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: fetch all issue nodes including Done (for snapshot)
-        if "match (n:issue)" in q and "return n {.*}" not in q and "return n.issue_id" in q:
+        if "match (n:issue" in q and "return n {.*}" not in q and "return n.issue_id" in q:
             rows = [
                 {"id": v["issue_id"], "status": v["status"], "delay_days": v["delay_days"]}
                 for v in self._issues.values()
@@ -110,7 +115,7 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: snapshot (status + delay per open issue)
-        if "match (n:issue)" in q and "n.status <> 'done'" in q and "return n.issue_id" in q:
+        if "match (n:issue" in q and "n.status <> 'done'" in q and "return n.issue_id" in q:
             rows = [
                 {"id": v["issue_id"], "status": v["status"], "delay_days": v["delay_days"]}
                 for v in self._issues.values()
@@ -157,6 +162,15 @@ class CsvGraphDB:
             ]
             return _ResultSet(rows)
 
+        # Pattern: blockers of delayed issues
+        if "match (blocker:issue)-[:depends_on]->(blocked:issue)" in q and "blocked.is_delayed = true" in q:
+            blocker_ids = {
+                src for src, tgt, _ in self._deps
+                if tgt in self._issues and self._issues[tgt]["is_delayed"] and src in self._issues
+            }
+            rows = [{"props": dict(self._issues[iid])} for iid in blocker_ids]
+            return _ResultSet(rows)
+
         # Pattern: blocked/delayed issues with dependents (for CypherBaseline)
         if "is_delayed = true" in q:
             delayed_ids = {iid for iid, v in self._issues.items() if v["is_delayed"]}
@@ -179,9 +193,6 @@ class CsvGraphDB:
             return _ResultSet([{"c": len(self._issues)}])
         if "return count(r)" in q:
             return _ResultSet([{"c": len(self._deps)}])
-        if "is_delayed = true" in q and "count(n)" in q:
-            n = sum(1 for v in self._issues.values() if v["is_delayed"])
-            return _ResultSet([{"c": n}])
 
         # Pattern: max chain depth (simplified)
         if "length(path)" in q:

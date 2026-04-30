@@ -46,7 +46,7 @@ def create_db():
     use_neo4j = os.getenv("USE_NEO4J", "false").lower() == "true"
     if use_neo4j:
         try:
-            from scripts.build_graph import GraphDB
+            from build_graph import GraphDB
             db = GraphDB(
                 uri      = os.getenv("NEO4J_URI",      "bolt://localhost:7687"),
                 user     = os.getenv("NEO4J_USER",     "neo4j"),
@@ -57,7 +57,7 @@ def create_db():
         except Exception as e:
             log.warning("Neo4j failed (%s) — falling back to CSV mode", e)
 
-    from core.csv_db import CsvGraphDB
+    from csv_db import CsvGraphDB
     db = CsvGraphDB(
         issues_path = os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
         deps_path   = os.getenv("DEPS_CSV",   "data/processed/dependencies.csv"),
@@ -80,8 +80,9 @@ async def lifespan(app: FastAPI):
     except ImportError:
         pass
     try:
+        log.info("[stage:load] Initialising database backend")
         _db, _db_mode = create_db()
-        from agents.agents import AgentPipeline
+        from agents import AgentPipeline
         api_key = os.getenv("GROQ_API_KEY", "")
         _pipeline = AgentPipeline(
             db             = _db,
@@ -125,18 +126,22 @@ def require_pipeline():
     if _pipeline is None:
         raise HTTPException(
             503,
-            "Pipeline not ready. Run: python scripts/preprocess.py --synthetic"
+            "Pipeline not ready. Run: python preprocess.py --synthetic"
         )
     return _pipeline
 
 
 @app.get("/health", tags=["system"])
 def health():
+    issues_path = Path(os.getenv("ISSUES_CSV", "data/processed/issues.csv"))
+    deps_path = Path(os.getenv("DEPS_CSV", "data/processed/dependencies.csv"))
     return {
         "status":      "ok" if _pipeline else "degraded",
         "db_mode":     _db_mode,
         "pipeline":    _pipeline is not None,
-        "data_loaded": Path("data/processed/issues.csv").exists(),
+        "data_loaded": issues_path.exists() and deps_path.exists(),
+        "issues_path": str(issues_path),
+        "deps_path": str(deps_path),
     }
 
 
@@ -184,6 +189,8 @@ def get_graph(issue_id: str):
     try:
         chain_nodes = pipeline.reasoning.dependency_chain(issue_id)
         root_node   = pipeline.perception.fetch_node(issue_id)
+        if root_node is None:
+            raise HTTPException(404, f"Issue {issue_id} not found")
         all_nodes   = ([root_node] if root_node else []) + chain_nodes
         seen_ids: set[str] = set()
         unique_nodes = []
@@ -192,16 +199,19 @@ def get_graph(issue_id: str):
             if n and n.issue_id not in seen_ids:
                 seen_ids.add(n.issue_id)
                 risk = risk_results.get(n.issue_id)
+                downstream = pipeline.reasoning.downstream_impact(n.issue_id)
                 unique_nodes.append({
                     "id":         n.issue_id,
                     "label":      n.issue_id,
-                    "summary":    n.summary[:80],
+                    "summary":    (n.summary or "")[:80],
                     "status":     n.status,
                     "priority":   n.priority,
                     "is_delayed": n.is_delayed,
                     "delay_days": n.delay_days,
                     "risk_level": risk.risk_level if risk else "None",
                     "risk_score": risk.risk_score if risk else 0.0,
+                    "downstream_impact_count": len(downstream),
+                    "highlight_high_risk": bool(risk and risk.risk_level == "High"),
                 })
         edge_records = pipeline.perception.db.run(
             "MATCH (src:Issue)-[r:DEPENDS_ON]->(tgt:Issue) "
@@ -212,6 +222,8 @@ def get_graph(issue_id: str):
         edges = [{"source": r["source"], "target": r["target"],
                   "link_type": r.get("link_type", "depends_on")} for r in edge_records]
         return {"issue_id": issue_id, "nodes": unique_nodes, "edges": edges}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -239,12 +251,12 @@ def get_dashboard(project: Optional[str] = Query(None)):
         plan      = pipeline.planning.create_mitigation_plan(risk_map, node_map)
         known_ids = set(node_map.keys())
 
-        if os.getenv("GOOGLE_API_KEY", "").startswith("AIza"):
+        if os.getenv("GROQ_API_KEY", ""):
             llm_out   = pipeline.decision.summarise_project_risks(top_risks, plan)
             validated = pipeline.critic.validate(llm_out, None, known_ids)
         else:
             validated = {
-                "summary":         "Add GOOGLE_API_KEY to .env to enable LLM explanations.",
+                "summary":         "Add GROQ_API_KEY to .env to enable LLM explanations.",
                 "root_causes":     [r.issue_id for r in top_risks[:3] if r.is_origin],
                 "recommendations": [p["rationale"] for p in plan[:3]],
                 "confidence":      0.0,
@@ -300,4 +312,78 @@ def counterfactual(issue_id: str, req: CounterfactualRequest = CounterfactualReq
         return {"status": "ok", "data": result}
     except Exception as e:
         log.exception("Counterfactual analysis failed")
+        raise HTTPException(500, str(e))
+
+
+@app.get("/predictive-analysis", tags=["predictive"])
+def predictive_analysis(
+    project: Optional[str] = Query(None),
+    threshold: float = Query(0.35, ge=0.0, le=1.0),
+    positive_target: int = Query(20, ge=1, le=30),
+    total_target: int = Query(30, ge=1, le=60),
+    use_trained_model: bool = Query(True),
+):
+    """Run predictive validation using only information available before each issue's delay window."""
+    try:
+        from predictive_analysis import run_predictive_experiment
+
+        payload = run_predictive_experiment(
+            issues_path=os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
+            deps_path=os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
+            project=project,
+            threshold=threshold,
+            positive_target=positive_target,
+            total_target=total_target,
+            output_path="data/processed/predictive_analysis.json",
+            model_path="data/models/predictive_model.joblib",
+            use_trained_model=use_trained_model,
+        )
+        return payload
+    except Exception as e:
+        log.exception("Predictive analysis failed")
+        raise HTTPException(500, str(e))
+
+
+@app.post("/train-predictive-model", tags=["predictive"])
+def train_predictive_model(
+    project: Optional[str] = Query(None),
+    folds: int = Query(5, ge=2, le=10),
+    text_encoder_model: str = Query("distilroberta-base"),
+):
+    """Train the predictive model using historical Jira snapshots and evaluate with CV + temporal holdout."""
+    try:
+        from predictive_model import train_predictive_model as train_model
+
+        payload = train_model(
+            issues_path=os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
+            deps_path=os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
+            project=project,
+            model_path="data/models/predictive_model.joblib",
+            n_splits=folds,
+            text_encoder_model=text_encoder_model,
+        )
+        return payload
+    except Exception as e:
+        log.exception("Predictive model training failed")
+        raise HTTPException(500, str(e))
+
+
+@app.get("/predictive-model-info", tags=["predictive"])
+def predictive_model_info():
+    """Expose the currently installed predictive model artifact for the UI."""
+    try:
+        from predictive_model import load_trained_model
+
+        artifact = load_trained_model("data/models/predictive_model.joblib")
+        return {
+            "available": True,
+            "model_kind": artifact.get("model_kind", "unknown"),
+            "text_encoder_model": artifact.get("text_encoder_model", "unknown"),
+            "trained_at": artifact.get("trained_at"),
+            "project": artifact.get("project"),
+        }
+    except FileNotFoundError:
+        return {"available": False}
+    except Exception as e:
+        log.exception("Predictive model info failed")
         raise HTTPException(500, str(e))

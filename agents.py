@@ -19,10 +19,12 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional
 
-from core.risk_engine import (
+from risk_engine import (
     IssueNode,
     PropagationConfig,
     RiskResult,
+    build_reverse_adjacency,
+    find_downstream_nodes,
     run_propagation,
 )
 
@@ -50,6 +52,14 @@ def parse_datetime(s: Optional[str]) -> Optional[datetime]:
     return None
 
 
+def parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"true", "1", "yes", "y"}
+
+
 def neo4j_record_to_issue_node(record: dict) -> IssueNode:
     return IssueNode(
         issue_id   = record.get("issue_id", ""),
@@ -61,7 +71,7 @@ def neo4j_record_to_issue_node(record: dict) -> IssueNode:
         due_date   = parse_datetime(record.get("due_date")),
         updated    = parse_datetime(record.get("updated")),
         delay_days = float(record["delay_days"]) if record.get("delay_days") not in (None, "") else None,
-        is_delayed = bool(record.get("is_delayed", False)),
+        is_delayed = parse_bool(record.get("is_delayed", False)),
     )
 
 
@@ -75,6 +85,7 @@ class PerceptionAgent:
         self._last_snapshot: Optional[dict] = None
 
     def fetch_all_nodes(self, project: Optional[str] = None) -> list[IssueNode]:
+        log.info("[stage:graph] Fetching issue nodes%s", f" for project {project}" if project else "")
         if project:
             query = "MATCH (n:Issue {project: $project}) WHERE n.status <> 'Done' RETURN n {.*} AS props"
             records = self.db.run(query, {"project": project})
@@ -86,6 +97,7 @@ class PerceptionAgent:
         return nodes
 
     def fetch_all_edges(self) -> list[tuple[str, str]]:
+        log.info("[stage:graph] Fetching dependency edges")
         query = "MATCH (src:Issue)-[:DEPENDS_ON]->(tgt:Issue) RETURN src.issue_id AS source, tgt.issue_id AS target"
         records = self.db.run(query)
         edges = [(r["source"], r["target"]) for r in records]
@@ -156,6 +168,7 @@ class GraphReasoningAgent:
         self.config = config or PropagationConfig()
 
     def global_risk_analysis(self, project: Optional[str] = None) -> dict[str, RiskResult]:
+        log.info("[stage:risk_propagation] Starting global risk analysis")
         nodes = self.perception.fetch_all_nodes(project)
         edges = self.perception.fetch_all_edges()
         return run_propagation(nodes, edges, self.config)
@@ -166,6 +179,18 @@ class GraphReasoningAgent:
 
     def dependency_chain(self, issue_id: str) -> list[IssueNode]:
         return self.perception.fetch_upstream_chain(issue_id)
+
+    def downstream_impact(self, issue_id: str, project: Optional[str] = None) -> list[str]:
+        nodes = self.perception.fetch_all_nodes(project)
+        node_ids = {n.issue_id for n in nodes}
+        edges = [
+            (src, tgt)
+            for src, tgt in self.perception.fetch_all_edges()
+            if src in node_ids and tgt in node_ids
+        ]
+        reverse_adj = build_reverse_adjacency(edges)
+        impacted = find_downstream_nodes(issue_id, reverse_adj, self.config.max_depth)
+        return sorted(nid for nid, depth in impacted.items() if nid != issue_id and depth > 0)
 
     def find_root_causes(self, issue_id: str) -> list[IssueNode]:
         chain = self.dependency_chain(issue_id)
