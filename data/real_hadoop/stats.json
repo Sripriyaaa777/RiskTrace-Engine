@@ -1,0 +1,21 @@
+{
+  "total_issues": 1500,
+  "total_dependencies": 4353,
+  "explicit_dependencies": 26,
+  "inferred_dependencies": 4327,
+  "dependency_coverage_pct": 99.5,
+  "status_distribution": {
+    "Open": 404,
+    "In Progress": 20,
+    "Done": 1076
+  },
+  "delayed_issues": 5,
+  "delayed_percentage": 0.3,
+  "issues_with_deadline": 19,
+  "avg_delay_days": 502.51,
+  "max_delay_days": 2199.16,
+  "isolated_nodes": 7,
+  "nodes_in_dependency_graph": 1493,
+  "avg_in_degree": 3.33,
+  "max_in_degree": 22
+}

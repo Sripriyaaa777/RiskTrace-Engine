@@ -1,0 +1,18 @@
+fastapi>=0.110.0,<1.0.0
+uvicorn>=0.29.0,<1.0.0
+pydantic>=2.6.0,<3.0.0
+python-dotenv>=1.0.0,<2.0.0
+python-multipart>=0.0.9,<1.0.0
+neo4j>=5.20.0,<6.0.0
+requests>=2.31.0,<3.0.0
+groq>=0.5.0,<1.0.0
+pymongo>=4.8.0,<5.0.0
+scikit-learn>=1.5.0,<2.0.0
+transformers>=4.46.0,<5.0.0
+torch>=2.4.0,<3.0.0
+# ── Agentic AI & RAG (added for LangGraph + ChromaDB upgrade) ──
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-groq>=0.2.0
+chromadb>=0.5.0
+# sentence-transformers not required — RAG uses chromadb's built-in onnxruntime embedder

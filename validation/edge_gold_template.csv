@@ -1,0 +1,5 @@
+source,target,label,notes
+HADOOP-123,HADOOP-101,1,Confirmed blocking relation from Jira link or manual review
+HADOOP-124,HADOOP-101,0,Similar component but not an actual dependency
+SPARK-88,SPARK-77,1,Sub-task depends on parent
+KAFKA-51,KAFKA-43,0,Text overlap only

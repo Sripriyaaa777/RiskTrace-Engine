@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IssueGraphAgent++ · Risk Intelligence Dashboard</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;600;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #0b0d12;
+    --surface:  #11141c;
+    --card:     #161b26;
+    --border:   #242a38;
+    --accent:   #4f8ef7;
+    --danger:   #f75e5e;
+    --warning:  #f7c35e;
+    --success:  #5ef7a0;
+    --muted:    #5a6478;
+    --text:     #e2e8f0;
+    --sub:      #8a93a8;
+    --mono:     'IBM Plex Mono', monospace;
+    --display:  'Syne', sans-serif;
+    --body:     'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    z-index: 100; padding: 0;
+  }
+  .sidebar-logo {
+    padding: 22px 20px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo h1 {
+    font-family: var(--display);
+    font-size: 15px; font-weight: 800;
+    color: var(--accent); letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+  .sidebar-logo span {
+    font-family: var(--mono);
+    font-size: 10px; color: var(--muted);
+    display: block; margin-top: 3px;
+  }
+  .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+  .nav-section-label {
+    font-family: var(--mono);
+    font-size: 9px; color: var(--muted);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 14px 20px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px; cursor: pointer;
+    color: var(--sub); font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--card); color: var(--text); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,142,247,.07); }
+  .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .sidebar-status {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px;
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-dot.online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .status-dot.offline { background: var(--danger); }
+
+  /* ── Main ── */
+  #main { margin-left: 220px; min-height: 100vh; }
+  #topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(11,13,18,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px; height: 54px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  #topbar h2 { font-family: var(--display); font-size: 16px; font-weight: 600; flex: 1; }
+  .mode-badge {
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 9px; border-radius: 4px;
+    background: rgba(79,142,247,.15); color: var(--accent);
+    border: 1px solid rgba(79,142,247,.3);
+  }
+  #page-content { padding: 28px; }
+
+  /* ── Cards ── */
+  .card-base {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .card-header-bar {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11px; color: var(--sub);
+  }
+  .card-header-bar .title { font-size: 13px; font-weight: 600; color: var(--text); font-family: var(--display); }
+
+  /* ── Summary Tiles ── */
+  .metric-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+  .metric-tile {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px;
+    position: relative; overflow: hidden;
+  }
+  .metric-tile::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .metric-tile.total::before { background: var(--accent); }
+  .metric-tile.high::before { background: var(--danger); }
+  .metric-tile.medium::before { background: var(--warning); }
+  .metric-tile.mode::before { background: var(--success); }
+  .metric-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+  .metric-value { font-family: var(--display); font-size: 32px; font-weight: 800; line-height: 1; }
+  .metric-tile.total .metric-value { color: var(--accent); }
+  .metric-tile.high .metric-value { color: var(--danger); }
+  .metric-tile.medium .metric-value { color: var(--warning); }
+  .metric-tile.mode .metric-value { color: var(--success); font-size: 18px; padding-top: 6px; }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  /* ── Risk Table ── */
+  .risk-table { width: 100%; border-collapse: collapse; }
+  .risk-table thead tr { border-bottom: 1px solid var(--border); }
+  .risk-table th { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; padding: 10px 14px; text-align: left; font-weight: 400; }
+  .risk-table td { padding: 11px 14px; border-bottom: 1px solid rgba(36,42,56,.6); vertical-align: middle; }
+  .risk-table tr:last-child td { border-bottom: none; }
+  .risk-table tr { transition: background .12s; }
+  .risk-table tr:hover td { background: rgba(255,255,255,.025); }
+  .issue-id {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--accent); cursor: pointer;
+  }
+  .issue-id:hover { text-decoration: underline; }
+  .badge-risk {
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 8px; border-radius: 4px; font-weight: 600;
+  }
+  .badge-risk.High { background: rgba(247,94,94,.15); color: var(--danger); border: 1px solid rgba(247,94,94,.3); }
+  .badge-risk.Medium { background: rgba(247,195,94,.12); color: var(--warning); border: 1px solid rgba(247,195,94,.3); }
+  .badge-risk.Low { background: rgba(94,247,160,.1); color: var(--success); border: 1px solid rgba(94,247,160,.25); }
+  .badge-risk.None { background: rgba(90,100,120,.15); color: var(--muted); border: 1px solid var(--border); }
+  .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .score-bar { height: 4px; border-radius: 2px; background: var(--border); width: 70px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+  .origin-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); display: inline-block; }
+
+  /* ── Query Panel ── */
+  #query-panel {
+    position: fixed; right: 0; top: 0; bottom: 0; width: 400px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    z-index: 200; display: flex; flex-direction: column;
+  }
+  #query-panel.open { transform: translateX(0); }
+  #query-panel-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  #query-panel-header h3 { font-family: var(--display); font-size: 15px; font-weight: 700; flex: 1; }
+  #chat-messages {
+    flex: 1; overflow-y: auto; padding: 18px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .msg { max-width: 88%; }
+  .msg.user { align-self: flex-end; }
+  .msg.assistant { align-self: flex-start; }
+  .msg-bubble {
+    padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; line-height: 1.55;
+  }
+  .msg.user .msg-bubble {
+    background: rgba(79,142,247,.18);
+    border: 1px solid rgba(79,142,247,.3);
+    color: var(--text); border-bottom-right-radius: 3px;
+  }
+  .msg.assistant .msg-bubble {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text); border-bottom-left-radius: 3px;
+  }
+  .msg-meta { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 4px; padding: 0 4px; }
+  #query-input-area {
+    padding: 14px;
+    border-top: 1px solid var(--border);
+  }
+  #query-input {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: var(--body);
+    font-size: 13px; resize: none; width: 100%; padding: 10px 12px;
+    outline: none; transition: border-color .15s;
+    min-height: 64px;
+  }
+  #query-input:focus { border-color: var(--accent); }
+  #query-input::placeholder { color: var(--muted); }
+  .btn-send {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 7px; padding: 8px 18px;
+    font-family: var(--display); font-weight: 600; font-size: 12px;
+    cursor: pointer; transition: opacity .15s; margin-top: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-send:hover { opacity: .85; }
+  .btn-send:disabled { opacity: .45; cursor: not-allowed; }
+  .quick-prompts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .qp {
+    font-family: var(--mono); font-size: 10px;
+    padding: 4px 10px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--sub); cursor: pointer; transition: all .12s;
+  }
+  .qp:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── API Config Panel ── */
+  #api-config {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px; width: 380px;
+    z-index: 500; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  #api-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    z-index: 499; backdrop-filter: blur(4px);
+  }
+  #api-config h3 { font-family: var(--display); font-size: 18px; margin-bottom: 6px; }
+  #api-config p { color: var(--sub); font-size: 12px; margin-bottom: 20px; }
+  .form-label-mono { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; display: block; }
+  .form-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text); font-family: var(--mono);
+    font-size: 12px; padding: 9px 12px; outline: none; transition: border-color .15s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .btn-primary {
+    width: 100%; background: var(--accent); color: #fff; border: none;
+    border-radius: 7px; padding: 11px; font-family: var(--display);
+    font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 18px;
+    transition: opacity .15s;
+  }
+  .btn-primary:hover { opacity: .85; }
+
+  /* ── Alerts ── */
+  .alert-item {
+    padding: 12px 14px; border-radius: 8px; margin-bottom: 8px;
+    border-left: 3px solid;
+    background: var(--card);
+    font-size: 12px;
+  }
+  .alert-item.high { border-color: var(--danger); }
+  .alert-item.medium { border-color: var(--warning); }
+  .alert-time { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Action Plan ── */
+  .plan-item {
+    padding: 12px 14px; border-radius: 8px; margin-bottom: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .plan-action-badge {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 4px; display: inline-block; margin-bottom: 5px;
+  }
+  .plan-action-badge.escalate { background: rgba(247,94,94,.12); color: var(--danger); }
+  .plan-action-badge.unblock { background: rgba(247,195,94,.12); color: var(--warning); }
+  .plan-action-badge.fix_delay { background: rgba(94,247,160,.1); color: var(--success); }
+  .plan-action-badge.monitor { background: rgba(90,100,120,.15); color: var(--muted); }
+
+  /* ── Loading ── */
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Overlay toggle ── */
+  #panel-toggle {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 50%; width: 52px; height: 52px;
+    font-size: 20px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(79,142,247,.4);
+    z-index: 150; display: flex; align-items: center; justify-content: center;
+    transition: transform .2s, box-shadow .2s;
+  }
+  #panel-toggle:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(79,142,247,.55); }
+
+  /* ── Tabs ── */
+  .tab-bar { display: flex; gap: 2px; padding: 4px; background: var(--surface); border-radius: 8px; margin-bottom: 18px; }
+  .tab-btn {
+    flex: 1; padding: 7px; border: none; background: transparent; color: var(--sub);
+    font-family: var(--mono); font-size: 11px; cursor: pointer; border-radius: 6px;
+    transition: all .15s;
+  }
+  .tab-btn.active { background: var(--card); color: var(--text); }
+
+  /* ── Misc ── */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .empty-state svg { width: 40px; height: 40px; margin-bottom: 12px; opacity: .3; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- API Config Modal -->
+<div id="api-overlay"></div>
+<div id="api-config">
+  <button
+    type="button"
+    onclick="closeConfig()"
+    aria-label="Close settings"
+    style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;"
+  >&times;</button>
+  <h3>⚡ Connect to Backend</h3>
+  <p>Enter your IssueGraphAgent++ API base URL to get started.</p>
+  <label class="form-label-mono">Dataset Backend</label>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="btn-primary" style="margin:0;padding:9px 12px;" onclick="selectDatasetBackend()">Dataset</button>
+  </div>
+  <label class="form-label-mono">API Base URL</label>
+  <input class="form-input" id="api-url-input" placeholder="http://127.0.0.1:8002" value="http://127.0.0.1:8002"/>
+  <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);" id="api-current-hint"></div>
+  <button class="btn-primary" onclick="saveConfig()">Connect &amp; Load Dashboard</button>
+  <div style="height:1px;background:var(--border);margin:18px 0;"></div>
+  <h3 style="margin-top:0">📦 Upload Dataset &amp; Choose Slice</h3>
+  <p style="margin-bottom:12px">Upload a Jira-like dataset, detect available project slices, and activate one directly into the live graph.</p>
+  <label class="form-label-mono">Upload Jira BSON / JSON / CSV</label>
+  <input class="form-input" id="dataset-file-input" type="file" />
+  <button class="btn-primary" id="dataset-upload-btn" style="margin-top:10px" onclick="uploadDatasetFromModal()">Upload Dataset</button>
+  <div id="dataset-upload-status" style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5"></div>
+  <label class="form-label-mono" style="margin-top:16px">Uploaded Dataset</label>
+  <select class="form-input" id="dataset-select" onchange="loadProjectsForSelectedDataset()">
+    <option value="">Choose uploaded dataset…</option>
+  </select>
+  <label class="form-label-mono" style="margin-top:12px">Project Slice</label>
+  <select class="form-input" id="dataset-project-select">
+    <option value="">Choose project…</option>
+  </select>
+  <label class="form-label-mono" style="margin-top:12px">Max Issues Per Slice</label>
+  <input class="form-input" id="dataset-max-issues" type="number" min="100" max="10000" value="1500" />
+  <button class="btn-primary" id="dataset-activate-btn" style="margin-top:12px" onclick="activateSelectedSlice()">Prepare Slice &amp; Activate</button>
+  <div id="dataset-activation-status" style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5"></div>
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+    <button
+      type="button"
+      onclick="closeConfig()"
+      style="background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;"
+    >Back to Dashboard</button>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <h1>IssueGraph<br/>Agent++</h1>
+    <span>Risk Intelligence v1.0</span>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section-label">Workspace</div>
+    <div class="nav-item active" onclick="showTab('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showTab('risks')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Risk Board
+    </div>
+    <div class="nav-item" onclick="showTab('plan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Action Plan
+    </div>
+    <div class="nav-item" onclick="showTab('alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      Alerts
+      <span id="alert-badge" style="display:none;background:var(--danger);color:#fff;font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;margin-left:auto;"></span>
+    </div>
+    <div class="nav-item" onclick="showTab('whatif')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      What-If
+    </div>
+    <div class="nav-section-label">Tools</div>
+    <div class="nav-item" onclick="refreshDashboard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Refresh Data
+    </div>
+    <div class="nav-item" onclick="openConfig()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      Settings
+    </div>
+  </div>
+  <div class="sidebar-status">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-label" style="color:var(--muted)">Connecting…</span>
+    <div style="margin-top:5px;color:var(--muted)" id="db-mode-label"></div>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<div id="main">
+  <div id="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <span class="mode-badge" id="mode-badge">CSV MODE</span>
+    <button onclick="toggleQueryPanel()" style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);color:var(--accent);border-radius:7px;padding:6px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      Ask AI Agent
+    </button>
+  </div>
+  <div id="page-content">
+
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard">
+      <div class="metric-grid" id="metric-grid">
+        <div class="metric-tile total"><div class="metric-label">Open Issues</div><div class="metric-value" id="m-total">—</div><div class="metric-sub">tracked issues</div></div>
+        <div class="metric-tile high"><div class="metric-label">High Risk</div><div class="metric-value" id="m-high">—</div><div class="metric-sub">need immediate action</div></div>
+        <div class="metric-tile medium"><div class="metric-label">Medium Risk</div><div class="metric-value" id="m-medium">—</div><div class="metric-sub">monitor closely</div></div>
+        <div class="metric-tile mode"><div class="metric-label">DB Mode</div><div class="metric-value" id="m-mode">—</div><div class="metric-sub">data source</div></div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-8">
+          <div class="card-base">
+            <div class="card-header-bar">
+              <span class="title">Top Risk Issues</span>
+              <span style="margin-left:auto;font-size:10px">sorted by risk score</span>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="risk-table" id="risk-table">
+                <thead><tr>
+                  <th>Issue ID</th>
+                  <th>Summary</th>
+                  <th>Risk</th>
+                  <th>Score</th>
+                  <th>Delay</th>
+                  <th>Root</th>
+                </tr></thead>
+                <tbody id="risk-tbody">
+                  <tr><td colspan="6"><div class="empty-state"><div class="spinner" style="margin:0 auto 10px"></div>Loading…</div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-xl-4">
+          <div class="card-base mb-3">
+            <div class="card-header-bar"><span class="title">GenAI Predictive Model</span></div>
+            <div style="padding:16px" id="predictive-summary">
+              <div class="empty-state">Loading predictive model…</div>
+            </div>
+          </div>
+          <div class="card-base mb-3">
+            <div class="card-header-bar"><span class="title">LLM Analysis</span></div>
+            <div style="padding:16px" id="llm-summary">
+              <div class="empty-state">No analysis yet</div>
+            </div>
+          </div>
+          <div class="card-base">
+            <div class="card-header-bar"><span class="title">Status Breakdown</span></div>
+            <div style="padding:16px" id="status-breakdown">
+              <div class="empty-state">Loading…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risks Tab -->
+    <div id="tab-risks" style="display:none">
+      <div class="card-base">
+        <div class="card-header-bar">
+          <span class="title">Risk Board</span>
+          <input id="risk-filter" placeholder="Filter by ID or summary…" oninput="filterRiskTable()" style="margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 10px;outline:none;width:200px"/>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="risk-table" id="risk-table-full">
+            <thead><tr>
+              <th>Issue ID</th><th>Summary</th><th>Risk</th><th>Score</th><th>Delay (days)</th><th>Affected By</th><th>Root Cause</th>
+            </tr></thead>
+            <tbody id="risk-tbody-full">
+              <tr><td colspan="7"><div class="empty-state">Load dashboard first</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan Tab -->
+    <div id="tab-plan" style="display:none">
+      <div class="card-base">
+        <div class="card-header-bar"><span class="title">Mitigation Action Plan</span></div>
+        <div style="padding:16px" id="plan-content">
+          <div class="empty-state">Load dashboard first</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts Tab -->
+    <div id="tab-alerts" style="display:none">
+      <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+        <button onclick="fetchAlerts()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:var(--mono);font-size:11px;cursor:pointer">Fetch Alerts</button>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Alerts are cleared after fetch (per spec).</span>
+      </div>
+      <div id="alerts-content">
+        <div class="empty-state">Click "Fetch Alerts" to load monitoring alerts.</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         WHAT-IF / COUNTERFACTUAL ANALYSIS TAB
+         ══════════════════════════════════════════════════════════ -->
+    <div id="tab-whatif" style="display:none">
+      <div style="max-width:960px">
+
+        <div style="margin-bottom:22px">
+          <h2 style="font-family:var(--display);font-size:19px;font-weight:700;margin-bottom:6px">Counterfactual What-If Analysis</h2>
+          <p style="color:var(--sub);font-size:13px;line-height:1.6">Hypothetically resolve any issue and see how downstream risk scores change — without touching the database. Uses the same temporal propagation engine as the live risk board.</p>
+        </div>
+
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+          <label style="font-family:var(--mono);font-size:10px;color:var(--muted);display:block;margin-bottom:10px;letter-spacing:.08em">ISSUE ID TO HYPOTHETICALLY RESOLVE</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input id="cf-input" type="text" placeholder="e.g. KAFKA-48"
+              style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none"
+              onkeydown="if(event.key==='Enter')runCounterfactual()"/>
+            <button onclick="runCounterfactual()" id="cf-run-btn"
+              style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px 22px;font-family:var(--mono);font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap">
+              &#9654; Run Simulation
+            </button>
+          </div>
+          <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted)">Tip: type any issue ID from the Risk Board and hit Enter to simulate its resolution.</div>
+        </div>
+
+        <div id="cf-spinner" style="display:none;text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted)">&#9203; Running propagation simulation&#8230;</div>
+
+        <div id="cf-result" style="display:none">
+          <div id="cf-banner" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-family:var(--mono);font-size:12px;color:var(--accent)"></div>
+          <div id="cf-impact-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px"></div>
+
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px;letter-spacing:.08em;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+              GRAPH DIFF &mdash; DEPENDENCY RISK VISUALISATION
+              <span style="display:flex;align-items:center;gap:5px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#f75e5e;display:inline-block"></span>High</span>
+              <span style="display:flex;align-items:center;gap:5px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#f7c35e;display:inline-block"></span>Medium</span>
+              <span style="display:flex;align-items:center;gap:5px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#5ef7a0;display:inline-block"></span>Low</span>
+              <span style="display:flex;align-items:center;gap:5px;color:var(--accent)"><span style="width:12px;height:12px;border-radius:50%;background:#4f8ef7;border:2px solid #fff;display:inline-block"></span>Resolved</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--danger);margin-bottom:8px;text-align:center;letter-spacing:.06em">&#9679; BEFORE</div>
+                <canvas id="cf-canvas-before" width="420" height="340" style="width:100%;border-radius:8px;background:var(--surface);display:block"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--success);margin-bottom:8px;text-align:center;letter-spacing:.06em">&#9679; AFTER (hypothetical)</div>
+                <canvas id="cf-canvas-after" width="420" height="340" style="width:100%;border-radius:8px;background:var(--surface);display:block"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+            <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.08em;display:flex;justify-content:space-between;align-items:center">
+              NODE-LEVEL RISK DELTA
+              <span id="cf-diff-count" style="color:var(--accent)"></span>
+            </div>
+            <table class="risk-table">
+              <thead><tr>
+                <th>Issue</th><th>Summary</th><th>Before</th><th>After</th><th>&Delta; Score</th>
+              </tr></thead>
+              <tbody id="cf-diff-body"></tbody>
+            </table>
+            <div id="cf-diff-empty" style="display:none;padding:28px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No downstream nodes changed — this issue may not be a propagation origin.</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-whatif -->
+
+  </div>
+</div>
+
+<!-- Query Panel (AI Chat) -->
+<div id="query-panel">
+  <div id="query-panel-header">
+    <h3>🤖 AI Risk Agent</h3>
+    <button onclick="toggleQueryPanel()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">&times;</button>
+  </div>
+  <div id="chat-messages">
+    <div class="msg assistant">
+      <div class="msg-bubble">Hey! I'm your IssueGraphAgent. Ask me about specific issues like <strong>HADOOP-42</strong>, or ask broader questions like <em>"What are the riskiest tasks?"</em></div>
+      <div class="msg-meta">IssueGraph Agent · ready</div>
+    </div>
+  </div>
+  <div id="query-input-area">
+    <div class="quick-prompts">
+      <span class="qp" onclick="usePrompt('What are the riskiest tasks?')">Top risks</span>
+      <span class="qp" onclick="usePrompt('Which issues are blocked?')">Blocked issues</span>
+      <span class="qp" onclick="usePrompt('Give me a risk summary')">Risk summary</span>
+    </div>
+    <textarea id="query-input" placeholder="Ask about an issue or project risk…" rows="2" onkeydown="handleQueryKey(event)"></textarea>
+    <button class="btn-send" id="send-btn" onclick="sendQuery()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Send
+    </button>
+  </div>
+</div>
+
+<button id="panel-toggle" onclick="toggleQueryPanel()" title="Ask AI Agent">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+</button>
+
+<script>
+// ── State ──
+const DATASET_API_BASE = 'http://127.0.0.1:8000';
+const DEFAULT_API_BASE = DATASET_API_BASE;
+const LEGACY_API_BASES = new Set([
+  'http://localhost:8001',
+  'http://127.0.0.1:8001',
+  'http://localhost:8002',
+  'http://127.0.0.1:8002',
+  'http://localhost:8004',
+  'http://127.0.0.1:8004'
+]);
+function getInitialApiBase() {
+  const queryApi = new URLSearchParams(window.location.search).get('api');
+  if (queryApi) {
+    const cleaned = queryApi.replace(/\/$/, '');
+    localStorage.setItem('igraph_api', cleaned);
+    return cleaned;
+  }
+  const saved = (localStorage.getItem('igraph_api') || '').replace(/\/$/, '');
+  if (!saved) return DEFAULT_API_BASE;
+  if (LEGACY_API_BASES.has(saved)) {
+    localStorage.setItem('igraph_api', DEFAULT_API_BASE);
+    return DEFAULT_API_BASE;
+  }
+  return saved;
+}
+
+// Force reset to port 8000 if stuck on old port
+if ((localStorage.getItem('igraph_api') || '').includes('8004')) {
+  localStorage.removeItem('igraph_api');
+}
+let API_BASE = getInitialApiBase();
+let dashData = null;
+let allRisks = [];
+let predictiveInfo = null;
+let predictiveAnalysis = null;
+let activeDatasetInfo = null;
+let uploadedDatasets = [];
+let currentDbMode = 'csv';
+
+function setDatasetStatus(id, text, tone='muted') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const colors = {
+    muted: 'var(--muted)',
+    progress: 'var(--accent)',
+    success: 'var(--success)',
+    error: 'var(--danger)',
+    warning: 'var(--warning)'
+  };
+  el.textContent = text;
+  el.style.color = colors[tone] || colors.muted;
+}
+
+function setBusyButton(id, busyText, busy) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  if (!btn.dataset.defaultLabel) {
+    btn.dataset.defaultLabel = btn.textContent;
+  }
+  btn.disabled = busy;
+  btn.style.opacity = busy ? '0.65' : '1';
+  btn.style.cursor = busy ? 'wait' : 'pointer';
+  btn.textContent = busy ? busyText : btn.dataset.defaultLabel;
+}
+
+function datasetNameFor(url) {
+  if (activeDatasetInfo?.dataset_name) return activeDatasetInfo.dataset_name;
+  if (url === DATASET_API_BASE) return 'Dataset';
+  return 'Custom backend';
+}
+
+// ── Config ──
+function saveConfig() {
+  const url = document.getElementById('api-url-input').value.trim().replace(/\/$/, '');
+  if (!url) return;
+  API_BASE = url;
+  localStorage.setItem('igraph_api', url);
+  closeConfig();
+  checkHealth().then(() => refreshDashboard());
+}
+function closeConfig() {
+  document.getElementById('api-overlay').style.display = 'none';
+  document.getElementById('api-config').style.display = 'none';
+  showTab('dashboard');
+}
+function selectDatasetBackend() {
+  const url = DATASET_API_BASE;
+  document.getElementById('api-url-input').value = url;
+  document.getElementById('api-current-hint').textContent = `Selected: ${datasetNameFor(url)}`;
+}
+function openConfig() {
+  document.getElementById('api-overlay').style.display = 'block';
+  document.getElementById('api-config').style.display = 'block';
+  document.getElementById('api-url-input').value = API_BASE || DEFAULT_API_BASE;
+  document.getElementById('api-current-hint').textContent = `Current: ${datasetNameFor(API_BASE || DEFAULT_API_BASE)}`;
+  loadDatasetManager();
+}
+
+async function loadDatasetManager() {
+  if (!API_BASE) return;
+  try {
+    const r = await fetch(`${API_BASE}/datasets`);
+    if (!r.ok) throw new Error(await r.text());
+    const payload = await r.json();
+    uploadedDatasets = payload.datasets || [];
+    if (payload.active_dataset) activeDatasetInfo = payload.active_dataset;
+    const select = document.getElementById('dataset-select');
+    select.innerHTML = '<option value="">Choose uploaded dataset…</option>' + uploadedDatasets.map(ds =>
+      `<option value="${ds.dataset_id}">${ds.original_name} (${(ds.projects || []).length} projects)</option>`
+    ).join('');
+  } catch (e) {
+    setDatasetStatus('dataset-upload-status', `Dataset manager unavailable: ${e.message}`, 'error');
+  }
+}
+
+async function loadProjectsForSelectedDataset() {
+  const datasetId = document.getElementById('dataset-select').value;
+  const projectSelect = document.getElementById('dataset-project-select');
+  projectSelect.innerHTML = '<option value="">Choose project…</option>';
+  if (!datasetId) return;
+  try {
+    const r = await fetch(`${API_BASE}/datasets/${datasetId}`);
+    if (!r.ok) throw new Error(await r.text());
+    const dataset = await r.json();
+    projectSelect.innerHTML = '<option value="">Choose project…</option>' + (dataset.projects || []).map(p =>
+      `<option value="${p.key}">${p.key} (${p.issue_count} issues)</option>`
+    ).join('');
+    setDatasetStatus('dataset-activation-status', `Loaded ${(dataset.projects || []).length} available project slices from ${dataset.original_name}.`, 'muted');
+  } catch (e) {
+    setDatasetStatus('dataset-activation-status', `Project loading failed: ${e.message}`, 'error');
+  }
+}
+
+async function uploadDatasetFromModal() {
+  const input = document.getElementById('dataset-file-input');
+  if (!input.files || !input.files[0]) {
+    setDatasetStatus('dataset-upload-status', 'Choose a BSON, JSON, or CSV file first.', 'warning');
+    return;
+  }
+  setBusyButton('dataset-upload-btn', 'Uploading…', true);
+  setDatasetStatus('dataset-upload-status', 'Uploading dataset and scanning available project slices…', 'progress');
+  const form = new FormData();
+  form.append('file', input.files[0]);
+  try {
+    const r = await fetch(`${API_BASE}/datasets/upload`, { method: 'POST', body: form });
+    if (!r.ok) throw new Error(await r.text());
+    const dataset = await r.json();
+    setDatasetStatus('dataset-upload-status', `Uploaded ${dataset.original_name}. Found ${(dataset.projects || []).length} project slices.`, 'success');
+    await loadDatasetManager();
+    document.getElementById('dataset-select').value = dataset.dataset_id;
+    await loadProjectsForSelectedDataset();
+  } catch (e) {
+    setDatasetStatus('dataset-upload-status', `Upload failed: ${e.message}`, 'error');
+  } finally {
+    setBusyButton('dataset-upload-btn', 'Uploading…', false);
+  }
+}
+
+async function activateSelectedSlice() {
+  const datasetId = document.getElementById('dataset-select').value;
+  const projectKey = document.getElementById('dataset-project-select').value;
+  const maxIssues = Number(document.getElementById('dataset-max-issues').value || 1500);
+  if (!datasetId || !projectKey) {
+    setDatasetStatus('dataset-activation-status', 'Choose both an uploaded dataset and a project slice.', 'warning');
+    return;
+  }
+  setBusyButton('dataset-activate-btn', 'Preparing slice…', true);
+  setDatasetStatus('dataset-activation-status', `Preparing ${projectKey} slice and activating it. This can take a little while for large Jira files…`, 'progress');
+  try {
+    const r = await fetch(`${API_BASE}/datasets/${datasetId}/activate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_key: projectKey,
+        max_issues: maxIssues,
+        include_subtasks: false,
+        augment_soft_deps: true,
+        activate: true,
+        use_neo4j: currentDbMode === 'neo4j'
+      })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const payload = await r.json();
+    setDatasetStatus(
+      'dataset-activation-status',
+      `Active slice: ${payload.project}. ${payload.slice.stats?.total_issues || '—'} issues, ${payload.slice.stats?.total_dependencies || '—'} dependencies. Backend mode: ${payload.activation?.db_mode || currentDbMode}.`,
+      'success'
+    );
+    await checkHealth();
+    await refreshDashboard();
+    setTimeout(() => closeConfig(), 450);
+  } catch (e) {
+    setDatasetStatus('dataset-activation-status', `Activation failed: ${e.message}`, 'error');
+  } finally {
+    setBusyButton('dataset-activate-btn', 'Preparing slice…', false);
+  }
+}
+
+// ── Health ──
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/health`);
+    const d = await r.json();
+    activeDatasetInfo = d.active_dataset || activeDatasetInfo;
+    currentDbMode = d.db_mode || currentDbMode;
+    const dot = document.getElementById('status-dot');
+    const lbl = document.getElementById('status-label');
+    const ml  = document.getElementById('db-mode-label');
+    if (d.status === 'ok') {
+      dot.className = 'status-dot online';
+      lbl.textContent = 'Connected';
+      lbl.style.color = 'var(--success)';
+    } else {
+      dot.className = 'status-dot offline';
+      lbl.textContent = 'Degraded';
+      lbl.style.color = 'var(--warning)';
+    }
+    const backendMode = (d.db_mode || 'unknown').toUpperCase();
+    const importSource = d.issues_path ? 'CSV staging imported to graph' : 'live graph';
+    ml.innerHTML = `backend: ${d.db_mode}<br><span style="font-size:10px;color:var(--muted)">${importSource}</span>`;
+    document.getElementById('mode-badge').textContent = `${backendMode} BACKEND`;
+    document.getElementById('m-mode').textContent = d.db_mode.toUpperCase();
+  } catch {
+    document.getElementById('status-dot').className = 'status-dot offline';
+    document.getElementById('status-label').textContent = 'Offline';
+    document.getElementById('status-label').style.color = 'var(--danger)';
+  }
+}
+
+// ── Dashboard ──
+async function refreshDashboard() {
+  if (!API_BASE) { openConfig(); return; }
+  setLoading(true);
+  try {
+    const [dashboardResp, modelInfoResp, predictiveResp] = await Promise.all([
+      fetch(`${API_BASE}/dashboard`),
+      fetch(`${API_BASE}/predictive-model-info`).catch(() => null),
+      fetch(`${API_BASE}/predictive-analysis?positive_target=5&total_target=8&use_trained_model=true`).catch(() => null)
+    ]);
+    const r = dashboardResp;
+    if (!r.ok) throw new Error(await r.text());
+    dashData = await r.json();
+    activeDatasetInfo = dashData.active_dataset || activeDatasetInfo;
+    predictiveInfo = modelInfoResp && modelInfoResp.ok ? await modelInfoResp.json() : null;
+    predictiveAnalysis = predictiveResp && predictiveResp.ok ? await predictiveResp.json() : null;
+    allRisks = dashData.top_risks || [];
+    renderDashboard(dashData);
+    renderRiskBoardFull(allRisks);
+    renderPlan(dashData.action_plan || []);
+  } catch (e) {
+    showError('Dashboard fetch failed: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderDashboard(d) {
+  const s = d.summary || {};
+  document.getElementById('m-total').textContent  = s.total_open   ?? '—';
+  document.getElementById('m-high').textContent   = s.high_risk    ?? '—';
+  document.getElementById('m-medium').textContent = s.medium_risk  ?? '—';
+
+  // Risk table
+  const tbody = document.getElementById('risk-tbody');
+  tbody.innerHTML = '';
+  (d.top_risks || []).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="issue-id" onclick="lookupIssue('${r.issue_id}')">${r.issue_id}</span></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)">${r.summary || ''}</td>
+      <td><span class="badge-risk ${r.risk_level}">${r.risk_level}</span></td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-bar-fill" style="width:${(r.risk_score||0)*100}%;background:${scoreColor(r.risk_score)}"></div></div>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${(r.risk_score||0).toFixed(2)}</span>
+        </div>
+      </td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--sub)">${r.delay_days != null ? r.delay_days.toFixed(1)+'d' : '—'}</td>
+      <td>${r.is_origin ? '<span class="origin-dot" title="Root cause"></span>' : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  if (!(d.top_risks||[]).length) tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">No risk data available</div></td></tr>';
+
+  renderPredictiveSummary();
+
+  // LLM Summary
+  const llm = d.llm_analysis || {};
+  const llmEl = document.getElementById('llm-summary');
+  if (llm.summary && llm.summary !== 'LLM unavailable. See structured data.' && !llm.error) {
+    llmEl.innerHTML = `
+      <p style="color:var(--sub);font-size:12px;line-height:1.6;margin-bottom:12px">${llm.summary}</p>
+      ${(llm.root_causes||[]).length ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Root Causes</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">${llm.root_causes.map(id=>`<span style="background:rgba(247,94,94,.12);color:var(--danger);border:1px solid rgba(247,94,94,.25);border-radius:4px;font-family:var(--mono);font-size:10px;padding:2px 7px">${id}</span>`).join('')}</div>` : ''}
+      ${(llm.recommendations||[]).length ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Recommendations</div><ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:5px">${llm.recommendations.slice(0,4).map(r=>`<li style="font-size:12px;color:var(--sub);padding-left:12px;border-left:2px solid var(--accent)">  ${r}</li>`).join('')}</ul>` : ''}
+      <div style="margin-top:12px;font-family:var(--mono);font-size:10px;color:var(--muted)">confidence: ${((llm.confidence||0)*100).toFixed(0)}%</div>
+    `;
+  } else {
+    llmEl.innerHTML = `<div style="font-size:12px;color:var(--muted);line-height:1.6">Add a <code style="color:var(--accent)">GROQ_API_KEY</code> to .env to enable LLM explanations.<br><br>The deterministic risk engine is still fully operational.</div>`;
+  }
+
+  // Status breakdown
+  const sc = s.status_counts || {};
+  const sbEl = document.getElementById('status-breakdown');
+  const total = Object.values(sc).reduce((a,b)=>a+b,0)||1;
+  sbEl.innerHTML = Object.entries(sc).map(([st,cnt])=>`
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;color:var(--sub)">${st}</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${cnt}</span>
+      </div>
+      <div class="score-bar" style="width:100%">
+        <div class="score-bar-fill" style="width:${(cnt/total*100).toFixed(0)}%;background:var(--accent)"></div>
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state">No status data</div>';
+}
+
+function renderPredictiveSummary() {
+  const el = document.getElementById('predictive-summary');
+  const datasetLabel = datasetNameFor(API_BASE);
+  const model = predictiveInfo || {};
+  const metrics = predictiveAnalysis?.metrics || null;
+  const topIssues = (predictiveAnalysis?.evaluated_issues || [])
+    .filter(r => r.predicted)
+    .sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0))
+    .slice(0, 3);
+
+  const fmtMetric = (value) => value == null ? '—' : Number(value).toFixed(3);
+  const trainedAt = model.trained_at ? new Date(model.trained_at).toLocaleString() : 'unknown';
+
+  if (!model.available && !metrics) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);line-height:1.6">No predictive model metadata available for this backend yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Dataset</div>
+          <div style="margin-top:5px;font-size:12px;color:var(--text)">${datasetLabel}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Classifier</div>
+          <div style="margin-top:5px;font-size:12px;color:var(--text)">${model.model_kind || 'active model'}</div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">GenAI text encoder</div>
+        <div style="margin-top:5px;font-size:12px;color:var(--accent);font-family:var(--mono)">${model.text_encoder_model || 'unknown'}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--sub);line-height:1.5">Issue summaries/descriptions are converted into transformer embeddings, then combined with graph/time features for delay-risk prediction.</div>
+        <div style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--muted)">trained: ${trainedAt}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">precision</div>
+          <div style="margin-top:5px;font-family:var(--display);font-size:18px;color:var(--text)">${fmtMetric(metrics?.precision)}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">recall</div>
+          <div style="margin-top:5px;font-family:var(--display);font-size:18px;color:var(--text)">${fmtMetric(metrics?.recall)}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">accuracy</div>
+          <div style="margin-top:5px;font-family:var(--display);font-size:18px;color:var(--text)">${fmtMetric(metrics?.accuracy)}</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Live flagged issues</div>
+        ${topIssues.length ? `
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${topIssues.map(r => `
+              <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+                <span class="issue-id" onclick="lookupIssue('${r.issue_id}')">${r.issue_id}</span>
+                <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:${scoreColor(r.risk_score)}">${(r.risk_score || 0).toFixed(3)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<div style="font-size:12px;color:var(--muted)">No predictive results loaded.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderRiskBoardFull(risks) {
+  const tbody = document.getElementById('risk-tbody-full');
+  tbody.innerHTML = '';
+  risks.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-search', `${r.issue_id} ${r.summary}`.toLowerCase());
+    tr.innerHTML = `
+      <td><span class="issue-id" onclick="lookupIssue('${r.issue_id}')">${r.issue_id}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub);font-size:12px">${r.summary||''}</td>
+      <td><span class="badge-risk ${r.risk_level}">${r.risk_level}</span></td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-bar-fill" style="width:${(r.risk_score||0)*100}%;background:${scoreColor(r.risk_score)}"></div></div>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${(r.risk_score||0).toFixed(2)}</span>
+        </div>
+      </td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--sub)">${r.delay_days!=null?r.delay_days.toFixed(1)+'d':'—'}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(r.chain||[]).join(' → ')||'—'}</td>
+      <td>${r.is_origin?'<span class="origin-dot"></span> <span style="font-size:11px;color:var(--danger);margin-left:4px">Root</span>':''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  if (!risks.length) tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No risks loaded. Refresh dashboard first.</div></td></tr>';
+}
+
+function filterRiskTable() {
+  const q = document.getElementById('risk-filter').value.toLowerCase();
+  document.querySelectorAll('#risk-tbody-full tr').forEach(tr => {
+    tr.style.display = (tr.getAttribute('data-search')||'').includes(q) ? '' : 'none';
+  });
+}
+
+function renderPlan(plan) {
+  const el = document.getElementById('plan-content');
+  if (!plan.length) { el.innerHTML = '<div class="empty-state">No action plan generated</div>'; return; }
+  el.innerHTML = plan.map((p,i) => `
+    <div class="plan-item">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:20px">#${i+1}</span>
+        <span class="issue-id" onclick="lookupIssue('${p.issue_id}')">${p.issue_id}</span>
+        <span class="plan-action-badge ${p.action}">${p.action}</span>
+        <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted)">score: ${(p.priority_score||0).toFixed(2)}</span>
+      </div>
+      <p style="font-size:12px;color:var(--sub);line-height:1.5;padding-left:28px;margin:0">${p.rationale}</p>
+    </div>
+  `).join('');
+}
+
+// ── Alerts ──
+async function fetchAlerts() {
+  try {
+    const r = await fetch(`${API_BASE}/alerts`);
+    const d = await r.json();
+    const el = document.getElementById('alerts-content');
+    const alerts = d.alerts || [];
+    const badge = document.getElementById('alert-badge');
+    if (!alerts.length) {
+      el.innerHTML = '<div class="empty-state">No new alerts at this time.</div>';
+      badge.style.display = 'none';
+      return;
+    }
+    badge.textContent = alerts.length;
+    badge.style.display = '';
+    el.innerHTML = alerts.map(a => `
+      <div class="alert-item ${a.severity}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase">${a.type.replace('_',' ')}</span>
+          ${a.issue_id ? `<span class="issue-id" onclick="lookupIssue('${a.issue_id}')">${a.issue_id}</span>` : ''}
+          <span style="margin-left:auto;font-size:10px;padding:2px 7px;border-radius:4px;font-family:var(--mono);background:${a.severity==='high'?'rgba(247,94,94,.12)':'rgba(247,195,94,.1)'};color:${a.severity==='high'?'var(--danger)':'var(--warning)'}">${a.severity}</span>
+        </div>
+        <p style="font-size:12px;color:var(--sub);margin-top:6px;line-height:1.5">${a.message}</p>
+        <div class="alert-time">${new Date(a.timestamp).toLocaleString()}</div>
+      </div>
+    `).join('');
+  } catch(e) {
+    showError('Failed to fetch alerts: ' + e.message);
+  }
+}
+
+// ── Issue Lookup ──
+async function lookupIssue(issueId) {
+  openQueryPanel();
+  addMessage('user', `Tell me about ${issueId}`);
+  const thinking = addThinking();
+  try {
+    const r = await fetch(`${API_BASE}/risk/${issueId}`);
+    const d = await r.json();
+    thinking.remove();
+    let text = `**${issueId}** — ${d.summary || ''}\n\n`;
+    text += `Risk: **${d.risk_level}** (score: ${(d.risk_score||0).toFixed(2)})\n`;
+    if (d.delay_days != null) text += `Delay: ${d.delay_days.toFixed(1)} days\n`;
+    if (d.is_origin) text += `⚠️ This is a root cause issue.\n`;
+    if ((d.affected_by||[]).length) text += `\nBlocked by: ${d.affected_by.join(', ')}\n`;
+    if (d.explanation) text += `\n${d.explanation}`;
+    addMessage('assistant', text);
+  } catch(e) {
+    thinking.remove();
+    addMessage('assistant', `Error fetching ${issueId}: ${e.message}`);
+  }
+}
+
+// ── Query Panel ──
+function toggleQueryPanel() {
+  document.getElementById('query-panel').classList.toggle('open');
+}
+function openQueryPanel() {
+  document.getElementById('query-panel').classList.add('open');
+}
+
+async function sendQuery() {
+  const input = document.getElementById('query-input');
+  const q = input.value.trim();
+  if (!q || !API_BASE) return;
+  input.value = '';
+  document.getElementById('send-btn').disabled = true;
+  addMessage('user', q);
+  const thinking = addThinking();
+  try {
+    const r = await fetch(`${API_BASE}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q }),
+    });
+    const d = await r.json();
+    thinking.remove();
+    const data = d.data || d;
+    let response = '';
+    if (data.llm_analysis?.summary) {
+      response = data.llm_analysis.summary;
+      if ((data.llm_analysis.recommendations||[]).length) {
+        response += '\n\n**Recommendations:**\n' + data.llm_analysis.recommendations.map(r=>`• ${r}`).join('\n');
+      }
+    } else if (data.explanation) {
+      response = data.explanation;
+    } else if ((data.top_risks||[]).length) {
+      response = `Found ${data.top_risks.length} risky issues. Top: ${data.top_risks.slice(0,3).map(r=>`${r.issue_id} (${r.risk_level})`).join(', ')}`;
+    } else if (data.message) {
+      response = data.message;
+    } else {
+      response = JSON.stringify(data, null, 2).substring(0, 500) + '…';
+    }
+    // Show agentic execution path if present
+    if (data._agent_execution_path?.length) {
+      response += '\n\n🔗 **Agent path:** ' + data._agent_execution_path.join(' → ');
+    }
+    if (data._rag_used) {
+      response += `\n📚 **RAG:** ${data._rag_context_size} docs retrieved`;
+    }
+    addMessage('assistant', response);
+  } catch(e) {
+    thinking.remove();
+    addMessage('assistant', 'Request failed: ' + e.message);
+  } finally {
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+function handleQueryKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
+}
+function usePrompt(p) { document.getElementById('query-input').value = p; document.getElementById('query-input').focus(); }
+
+function addMessage(role, text) {
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  const formattedText = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  el.innerHTML = `<div class="msg-bubble">${formattedText}</div><div class="msg-meta">${role === 'user' ? 'You' : 'IssueGraph Agent'} · ${new Date().toLocaleTimeString()}</div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth' });
+  return el;
+}
+function addThinking() {
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.innerHTML = `<div class="msg-bubble" style="display:flex;align-items:center;gap:8px"><div class="spinner"></div><span style="color:var(--muted);font-size:12px">Analyzing…</span></div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth' });
+  return el;
+}
+
+// ── Tabs ──
+const tabs = ['dashboard','risks','plan','alerts','whatif'];
+const tabTitles = { dashboard: 'Dashboard', risks: 'Risk Board', plan: 'Action Plan', alerts: 'Monitoring Alerts', whatif: 'What-If Analysis' };
+function showTab(name) {
+  tabs.forEach(t => {
+    document.getElementById(`tab-${t}`).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', el.textContent.toLowerCase().includes(name) || (name==='dashboard'&&i===0));
+  });
+  document.getElementById('page-title').textContent = tabTitles[name] || name;
+}
+
+// ── Utils ──
+function scoreColor(score) {
+  if (score >= 0.7) return 'var(--danger)';
+  if (score >= 0.35) return 'var(--warning)';
+  return 'var(--success)';
+}
+function setLoading(on) {}
+function showError(msg) {
+  console.error(msg);
+  addMessage('assistant', '⚠️ ' + msg);
+  openQueryPanel();
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('api-overlay').addEventListener('click', closeConfig);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.getElementById('api-config').style.display === 'block') {
+      closeConfig();
+    }
+  });
+  if (API_BASE) {
+    document.getElementById('api-overlay').style.display = 'none';
+    document.getElementById('api-config').style.display = 'none';
+    checkHealth().then(() => refreshDashboard());
+    setInterval(checkHealth, 30000);
+  } else {
+    document.getElementById('status-dot').className = 'status-dot offline';
+    document.getElementById('status-label').textContent = 'Not connected';
+  }
+});
+
+// ── What-If / Counterfactual Analysis ────────────────────────────────────────
+
+async function runCounterfactual() {
+  const id = (document.getElementById('cf-input').value || '').trim().toUpperCase();
+  if (!id) { showError('Enter an issue ID first.'); return; }
+  if (!API_BASE) { openConfig(); return; }
+
+  document.getElementById('cf-result').style.display = 'none';
+  document.getElementById('cf-spinner').style.display = '';
+  document.getElementById('cf-run-btn').disabled = true;
+
+  try {
+    const r = await fetch(`${API_BASE}/counterfactual/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolve_as: 'Done' })
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.detail || 'Request failed');
+    renderCounterfactual(json.data);
+  } catch(e) {
+    showError('What-If simulation failed: ' + e.message);
+  } finally {
+    document.getElementById('cf-spinner').style.display = 'none';
+    document.getElementById('cf-run-btn').disabled = false;
+  }
+}
+
+function renderCounterfactual(data) {
+  // Banner
+  const imp = data.impact_summary;
+  document.getElementById('cf-banner').textContent =
+    `\u2713 Simulating resolution of ${data.issue_id}: "${data.summary}" ` +
+    `\u2014 ${imp.nodes_improved} nodes would improve, ` +
+    `saving an estimated ${imp.total_delay_days_saved} combined delay-days.`;
+
+  // Impact cards
+  const cards = [
+    { label: 'Nodes Improved',      val: imp.nodes_improved,         color: 'var(--success)' },
+    { label: 'High Risk Reduced',   val: imp.high_risk_reduction,    color: 'var(--danger)'  },
+    { label: 'Delay-Days Saved',    val: imp.total_delay_days_saved, color: 'var(--warning)' },
+    { label: 'Nodes Worsened',      val: imp.nodes_worsened,         color: 'var(--muted)'   },
+  ];
+  document.getElementById('cf-impact-cards').innerHTML = cards.map(c => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px">
+      <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:${c.color}">${c.val}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;letter-spacing:.05em">${c.label}</div>
+    </div>`).join('');
+
+  // Graph diff: prioritize the same changed nodes shown in the delta table.
+  renderCFGraph('cf-canvas-before', data.graph_nodes, data.graph_edges, data.diff || [], 'before', data.issue_id);
+  renderCFGraph('cf-canvas-after',  data.graph_nodes, data.graph_edges, data.diff || [], 'after',  data.issue_id);
+
+  // Diff table
+  const tbody = document.getElementById('cf-diff-body');
+  const empty = document.getElementById('cf-diff-empty');
+  document.getElementById('cf-diff-count').textContent = data.diff.length + ' nodes changed';
+
+  if (data.diff.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = '';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = data.diff.map(d => {
+      const improved = d.delta < 0;
+      const arrow    = improved ? '\u25bc' : '\u25b2';
+      const aColor   = improved ? 'var(--success)' : 'var(--danger)';
+      const blvl     = d.before_level.toLowerCase();
+      const alvl     = d.after_level.toLowerCase();
+      const badgeStyle = (lvl) => {
+        const c = lvl==='high'?'var(--danger)':lvl==='medium'?'var(--warning)':'var(--success)';
+        return `style="background:${c}22;color:${c};font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid ${c}44"`;
+      };
+      return `<tr>
+        <td><span style="font-family:var(--mono);font-size:12px">${d.issue_id}</span></td>
+        <td style="color:var(--sub);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(d.summary||'').slice(0,55)}</td>
+        <td><span ${badgeStyle(blvl)}>${d.before_level} &nbsp;${d.before_score.toFixed(2)}</span></td>
+        <td><span ${badgeStyle(alvl)}>${d.after_level} &nbsp;${d.after_score.toFixed(2)}</span></td>
+        <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:${aColor}">${arrow} ${Math.abs(d.delta).toFixed(3)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('cf-result').style.display = '';
+}
+
+function renderCFGraph(canvasId, graphNodes, graphEdges, diffRows, mode, resolvedId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const changedIds = new Set((diffRows || []).map(d => d.issue_id));
+  const diffById = new Map((diffRows || []).map(d => [d.issue_id, d]));
+  const sortedDiffRows = [...(diffRows || [])]
+    .sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0));
+  const largeImpactView = changedIds.size >= 24;
+  const visibleLimit = largeImpactView ? 30 : changedIds.size;
+  const visibleChangedIds = new Set(sortedDiffRows.slice(0, visibleLimit).map(d => d.issue_id));
+  const hiddenChangedCount = Math.max(0, changedIds.size - visibleChangedIds.size);
+
+  // Show the highest-impact changed nodes plus the resolved node. The full
+  // changed-node list remains in the table, which is better for dense cases.
+  let nodes = graphNodes.filter(n => n.id === resolvedId || visibleChangedIds.has(n.id));
+  if (!nodes.length) {
+    nodes = graphNodes.filter(n => n.id === resolvedId);
+  }
+  if (nodes.length < 2) {
+    const context = graphNodes.filter(n => n.id !== resolvedId).slice(0, 34);
+    nodes = nodes.concat(context);
+  }
+
+  const displayWidth = Math.max(420, Math.floor(canvas.clientWidth || canvas.getBoundingClientRect().width || 420));
+  canvas.width = displayWidth;
+  const dynamicHeight = Math.max(390, Math.min(760, 300 + Math.ceil(nodes.length / 8) * 62));
+  canvas.height = dynamicHeight;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Build id set for edge filtering
+  const idSet = new Set(nodes.map(n => n.id));
+  const edges = graphEdges.filter(e => idSet.has(e.source) && idSet.has(e.target));
+
+  const pos = {};
+
+  if (largeImpactView) {
+    const resolved = nodes.find(n => n.id === resolvedId);
+    const changed = nodes
+      .filter(n => n.id !== resolvedId)
+      .sort((a, b) => Math.abs(diffById.get(b.id)?.delta || 0) - Math.abs(diffById.get(a.id)?.delta || 0));
+
+    if (resolved) {
+      pos[resolved.id] = { x: W / 2, y: H / 2, fixed: true };
+    }
+
+    // Start from concentric impact rings instead of a rigid grid. Highest
+    // deltas sit closer to the resolved node, then force relaxation cleans it up.
+    const ringGap = Math.max(76, Math.min(116, W / 6));
+    const centerX = W / 2;
+    const centerY = H / 2;
+    changed.forEach((n, i) => {
+      const ring = Math.floor(Math.sqrt(i / 5));
+      const firstInRing = ring === 0 ? 0 : 5 * ring * ring;
+      const indexInRing = i - firstInRing;
+      const countInRing = Math.max(6, 8 + ring * 7);
+      const angle = (2 * Math.PI * indexInRing / countInRing) - Math.PI / 2 + ring * 0.38;
+      const radius = Math.min(Math.min(W, H) * 0.44, 58 + ring * ringGap);
+      pos[n.id] = {
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle)
+      };
+    });
+  } else {
+    nodes.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+      pos[n.id] = {
+        x: W / 2 + (W * 0.38) * Math.cos(angle),
+        y: H / 2 + (H * 0.38) * Math.sin(angle)
+      };
+    });
+  }
+
+  const iterations = largeImpactView ? 120 : 80;
+  const repulsion = largeImpactView ? 2600 : 1200;
+  const spring = largeImpactView ? 0.012 : 0.018;
+  for (let iter = 0; iter < iterations; iter++) {
+    const f = {};
+    nodes.forEach(n => { f[n.id] = { x: 0, y: 0 }; });
+
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i].id, b = nodes[j].id;
+        let dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+        const ff = repulsion / (d * d);
+        f[a].x += dx / d * ff; f[a].y += dy / d * ff;
+        f[b].x -= dx / d * ff; f[b].y -= dy / d * ff;
+      }
+    }
+
+    edges.forEach(e => {
+      if (!pos[e.source] || !pos[e.target]) return;
+      const dx = pos[e.target].x - pos[e.source].x;
+      const dy = pos[e.target].y - pos[e.source].y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      const ff = d * spring;
+      f[e.source].x += dx / d * ff; f[e.source].y += dy / d * ff;
+      f[e.target].x -= dx / d * ff; f[e.target].y -= dy / d * ff;
+    });
+
+    nodes.forEach(n => {
+      f[n.id].x += (W / 2 - pos[n.id].x) * (largeImpactView ? 0.006 : 0.012);
+      f[n.id].y += (H / 2 - pos[n.id].y) * (largeImpactView ? 0.006 : 0.012);
+    });
+
+    nodes.forEach(n => {
+      if (pos[n.id].fixed) return;
+      pos[n.id].x = Math.max(24, Math.min(W - 24, pos[n.id].x + f[n.id].x * 0.5));
+      pos[n.id].y = Math.max(28, Math.min(H - 28, pos[n.id].y + f[n.id].y * 0.5));
+    });
+  }
+
+  if (largeImpactView) {
+    ctx.fillStyle = 'rgba(138,147,168,0.9)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    const hiddenText = hiddenChangedCount ? `; ${hiddenChangedCount} more listed below` : '';
+    ctx.fillText(`Top ${visibleChangedIds.size} of ${changedIds.size} changed nodes shown${hiddenText}`, 14, 20);
+  }
+
+  // Draw edges
+  ctx.lineWidth = 1;
+  edges.forEach(e => {
+    if (!pos[e.source] || !pos[e.target]) return;
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(90,100,120,0.35)';
+    ctx.moveTo(pos[e.source].x, pos[e.source].y);
+    ctx.lineTo(pos[e.target].x, pos[e.target].y);
+    ctx.stroke();
+    // Arrow head
+    const dx = pos[e.target].x - pos[e.source].x;
+    const dy = pos[e.target].y - pos[e.source].y;
+    const d  = Math.sqrt(dx * dx + dy * dy) || 1;
+    const tx = pos[e.target].x - dx / d * 10;
+    const ty = pos[e.target].y - dy / d * 10;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(90,100,120,0.5)';
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - dy/d*4 - dx/d*6, ty + dx/d*4 - dy/d*6);
+    ctx.lineTo(tx + dy/d*4 - dx/d*6, ty - dx/d*4 - dy/d*6);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const p   = pos[n.id];
+    const lvl = mode === 'before' ? n.before_level : n.after_level;
+    const isResolved = n.id === resolvedId && mode === 'after';
+    const diff = diffById.get(n.id);
+    const isChanged = Boolean(diff);
+    const r   = isResolved ? 13 : isChanged ? 9 : 8;
+
+    let fill;
+    if (isResolved)        fill = '#4f8ef7';
+    else if (lvl === 'High')   fill = '#f75e5e';
+    else if (lvl === 'Medium') fill = '#f7c35e';
+    else if (lvl === 'Low')    fill = '#5ef7a0';
+    else fill = '#5a6478';
+
+    // Glow for high-risk
+    if (lvl === 'High' || isResolved) {
+      ctx.beginPath();
+      const grad = ctx.createRadialGradient(p.x, p.y, r*0.5, p.x, p.y, r*2.5);
+      grad.addColorStop(0, fill + '55');
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.arc(p.x, p.y, r * 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+    ctx.fillStyle = fill;
+    ctx.fill();
+
+    if (isChanged && !isResolved) {
+      const improved = diff.delta < 0;
+      ctx.strokeStyle = improved ? '#5ef7a0cc' : '#f75e5ecc';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    if (isResolved || n.id === resolvedId) {
+      ctx.strokeStyle = '#ffffff88';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    // Label
+    ctx.fillStyle = 'rgba(226,232,240,0.82)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    const lbl = n.id.length > 12 ? n.id.slice(0, 11) + '\u2026' : n.id;
+    ctx.fillText(lbl, p.x, p.y + r + 10);
+  });
+}
+
+// Allow prefilling from Risk Board
+function prefillWhatIf(issueId) {
+  document.getElementById('cf-input').value = issueId;
+  showTab('whatif');
+}
+
+</script>
+</body>
+</html>
