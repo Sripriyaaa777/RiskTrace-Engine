@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 import tempfile
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -69,10 +70,17 @@ def create_db():
 
 _db = None
 _pipeline = None
+_rag = None
 _db_mode = "uninitialised"
+_rag_status = {
+    "ready": False,
+    "initializing": False,
+    "last_error": None,
+    "dataset": None,
+}
 _active_dataset = {
     "dataset_id": None,
-    "dataset_name": "Synthetic demo dataset" if os.getenv("ISSUES_CSV", "").endswith("processed/issues.csv") else "Custom dataset",
+    "dataset_name": "Dataset",
     "project": None,
     "issues_path": os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
     "deps_path": os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
@@ -81,26 +89,15 @@ _active_dataset = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _db, _pipeline, _db_mode
+    global _db, _pipeline, _rag, _db_mode
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
     try:
-        log.info("[stage:load] Initialising database backend")
-        _db, _db_mode = create_db()
-        from agents import AgentPipeline
-        api_key = os.getenv("GROQ_API_KEY", "")
-        _pipeline = AgentPipeline(
-            db             = _db,
-            openai_api_key = api_key,
-            poll_interval  = int(os.getenv("MONITOR_INTERVAL", "60")),
-        )
-        _pipeline.start_monitoring()
-        _active_dataset["issues_path"] = os.getenv("ISSUES_CSV", "data/processed/issues.csv")
-        _active_dataset["deps_path"] = os.getenv("DEPS_CSV", "data/processed/dependencies.csv")
-        log.info("IssueGraphAgent++ ready  [mode: %s]", _db_mode)
+        _refresh_pipeline()
+        log.info("RiskTrace runtime ready  [mode: %s]", _db_mode)
     except Exception as e:
         log.error("Startup failed: %s", e, exc_info=True)
     yield
@@ -147,25 +144,148 @@ def _build_active_dataset_label(dataset_id: Optional[str], original_name: str, p
     return original_name
 
 
+def _set_runtime_state() -> None:
+    app.state.pipeline = _pipeline
+    app.state.rag = _rag
+    app.state.rag_status = dict(_rag_status)
+
+
+def _current_dataset_signature() -> dict:
+    return {
+        "issues_csv": os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
+        "deps_csv": os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
+        "db_mode": _db_mode,
+    }
+
+
+def _start_rag_background_build(force_rebuild: bool = False) -> None:
+    global _rag, _rag_status
+
+    if _rag_status.get("initializing"):
+        return
+
+    dataset_signature = _current_dataset_signature()
+    _rag_status = {
+        "ready": False,
+        "initializing": True,
+        "last_error": None,
+        "dataset": dataset_signature,
+    }
+    _set_runtime_state()
+
+    def _worker():
+        global _rag, _rag_status
+        try:
+            from rag_engine import RagEngine
+
+            rag = RagEngine()
+            built = rag.build_or_load(
+                issues_csv=dataset_signature["issues_csv"],
+                deps_csv=dataset_signature["deps_csv"],
+                force_rebuild=force_rebuild,
+            )
+            if built and rag.is_ready:
+                _rag = rag
+                if _pipeline is not None and hasattr(_pipeline, "rag"):
+                    _pipeline.rag = rag
+                _rag_status = {
+                    "ready": True,
+                    "initializing": False,
+                    "last_error": None,
+                    "dataset": dataset_signature,
+                }
+                log.info("RAG engine attached in background: %s", rag.get_stats())
+            else:
+                _rag = None
+                if _pipeline is not None and hasattr(_pipeline, "rag"):
+                    _pipeline.rag = None
+                _rag_status = {
+                    "ready": False,
+                    "initializing": False,
+                    "last_error": "RAG build returned not ready",
+                    "dataset": dataset_signature,
+                }
+        except Exception as e:
+            _rag = None
+            if _pipeline is not None and hasattr(_pipeline, "rag"):
+                _pipeline.rag = None
+            _rag_status = {
+                "ready": False,
+                "initializing": False,
+                "last_error": str(e),
+                "dataset": dataset_signature,
+            }
+            log.warning("Background RAG initialisation failed: %s", e)
+        finally:
+            _set_runtime_state()
+
+    threading.Thread(target=_worker, daemon=True, name="risktrace-rag-init").start()
+
+
 def _refresh_pipeline() -> None:
-    global _db, _pipeline, _db_mode
+    global _db, _pipeline, _rag, _db_mode, _rag_status
     if _pipeline:
         _pipeline.stop_monitoring()
     if _db:
         _db.close()
 
+    _rag = None
+    _rag_status = {
+        "ready": False,
+        "initializing": False,
+        "last_error": None,
+        "dataset": None,
+    }
     _db, _db_mode = create_db()
-    from agents import AgentPipeline
+
     api_key = os.getenv("GROQ_API_KEY", "")
-    _pipeline = AgentPipeline(
-        db=_db,
-        openai_api_key=api_key,
-        poll_interval=int(os.getenv("MONITOR_INTERVAL", "60")),
-    )
+
+    try:
+        from agentic_pipeline import RiskTraceAgenticPipeline
+
+        _pipeline = RiskTraceAgenticPipeline(
+            db=_db,
+            openai_api_key=api_key,
+            poll_interval=int(os.getenv("MONITOR_INTERVAL", "60")),
+            rag_engine=_rag,
+        )
+        log.info("Agentic pipeline enabled")
+    except Exception as e:
+        log.warning("Agentic pipeline unavailable, falling back to classic pipeline: %s", e)
+        from agents import AgentPipeline
+
+        _pipeline = AgentPipeline(
+            db=_db,
+            openai_api_key=api_key,
+            poll_interval=int(os.getenv("MONITOR_INTERVAL", "60")),
+        )
+
     _pipeline.start_monitoring()
+    _set_runtime_state()
+    _start_rag_background_build(force_rebuild=False)
 
 
 def _activate_slice(issues_csv: str, deps_csv: str, *, use_neo4j: bool, dataset_id: Optional[str], dataset_name: str, project_key: Optional[str]) -> dict:
+    desired_mode = "neo4j" if use_neo4j else "csv"
+    if (
+        _active_dataset.get("dataset_id") == dataset_id
+        and _active_dataset.get("project") == project_key
+        and _active_dataset.get("issues_path") == issues_csv
+        and _active_dataset.get("deps_path") == deps_csv
+        and _db_mode == desired_mode
+        and _pipeline is not None
+    ):
+        return {
+            "status": "ok",
+            "db_mode": _db_mode,
+            "dataset_id": dataset_id,
+            "dataset_name": dataset_name,
+            "project": project_key,
+            "issues_path": issues_csv,
+            "deps_path": deps_csv,
+            "reused_runtime": True,
+        }
+
     os.environ["ISSUES_CSV"] = issues_csv
     os.environ["DEPS_CSV"] = deps_csv
     os.environ["USE_NEO4J"] = "true" if use_neo4j else "false"
@@ -202,27 +322,64 @@ def _activate_slice(issues_csv: str, deps_csv: str, *, use_neo4j: bool, dataset_
 
 
 def require_pipeline():
-    if _pipeline is None:
+    # Try app.state first (survives uvicorn reload), fall back to global
+    pipeline = getattr(app.state, "pipeline", None) or _pipeline
+    if pipeline is None:
         raise HTTPException(
             503,
-            "Pipeline not ready. Run: python preprocess.py --synthetic"
+            "Pipeline not ready yet. Start the backend and wait for RAG / graph initialisation."
         )
-    return _pipeline
+    return pipeline
 
 
 @app.get("/health", tags=["system"])
 def health():
     issues_path = Path(os.getenv("ISSUES_CSV", "data/processed/issues.csv"))
     deps_path = Path(os.getenv("DEPS_CSV", "data/processed/dependencies.csv"))
+    pipeline = getattr(app.state, "pipeline", None) or _pipeline
     return {
-        "status":      "ok" if _pipeline else "degraded",
+        "status":      "ok" if pipeline else "degraded",
         "db_mode":     _db_mode,
-        "pipeline":    _pipeline is not None,
+        "pipeline":    pipeline is not None,
+        "pipeline_type": type(pipeline).__name__ if pipeline else None,
+        "rag_ready": bool((getattr(app.state, "rag", None) or _rag) and (getattr(app.state, "rag", None) or _rag).is_ready),
         "data_loaded": issues_path.exists() and deps_path.exists(),
         "issues_path": str(issues_path),
         "deps_path": str(deps_path),
         "active_dataset": dict(_active_dataset),
     }
+
+
+@app.get("/rag-status", tags=["system"])
+def rag_status():
+    """Shows RAG knowledge base status — proves ChromaDB is live."""
+    # Always read from app.state — survives uvicorn --reload process boundary
+    rag = getattr(app.state, "rag", None) or _rag
+    if rag is not None:
+        stats = rag.get_stats()
+        stats["is_ready"] = rag.is_ready
+        stats["initializing"] = False
+        return stats
+    status = dict(getattr(app.state, "rag_status", _rag_status))
+    status.setdefault("ready", False)
+    return status
+
+
+@app.get("/agent-trace", tags=["agents"])
+def agent_trace(query: str = Query("What are the top blocked issues and why?")):
+    """Returns LangGraph execution path — demonstrates real agentic routing."""
+    pipeline = require_pipeline()
+    try:
+        result = pipeline.run_query(query)
+        return {
+            "query":              query,
+            "execution_path":     result.get("_agent_execution_path", []),
+            "rag_used":           result.get("_rag_used", False),
+            "rag_docs_retrieved": result.get("_rag_context_size", 0),
+            "answer_summary":     (result.get("llm_analysis") or {}).get("summary", ""),
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.get("/datasets", tags=["datasets"])

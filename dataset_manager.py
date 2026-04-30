@@ -106,6 +106,24 @@ def prepare_slice(
     dataset = _find_dataset(index, dataset_id)
     project_key = project_key.upper()
     output_dir = SLICE_ROOT / dataset_id / project_key.lower()
+    existing_slice = dataset.get("slices", {}).get(project_key)
+    expected_issues = output_dir / "issues.csv"
+    expected_deps = output_dir / "dependencies.csv"
+
+    if (
+        existing_slice
+        and existing_slice.get("max_issues") == max_issues
+        and existing_slice.get("include_subtasks") == include_subtasks
+        and existing_slice.get("augment_soft_deps") == augment_soft_deps
+        and Path(existing_slice.get("issues_csv", "")).exists()
+        and Path(existing_slice.get("deps_csv", "")).exists()
+        and expected_issues.exists()
+        and expected_deps.exists()
+    ):
+        cached = dict(existing_slice)
+        cached["cached"] = True
+        return cached
+
     run_pipeline(
         input_path=Path(dataset["raw_path"]),
         output_dir=output_dir,
@@ -128,7 +146,7 @@ def prepare_slice(
         "include_subtasks": include_subtasks,
         "augment_soft_deps": augment_soft_deps,
         "stats": stats,
+        "cached": False,
     }
     _save_index(index)
     return dataset["slices"][project_key]
-

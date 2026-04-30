@@ -632,17 +632,16 @@
 
 <script>
 // ── State ──
-const DATASET_API_BASE = 'http://127.0.0.1:8004';
+const DATASET_API_BASE = 'http://127.0.0.1:8000';
 const DEFAULT_API_BASE = DATASET_API_BASE;
 const LEGACY_API_BASES = new Set([
-  'http://localhost:8000',
-  'http://127.0.0.1:8000',
   'http://localhost:8001',
   'http://127.0.0.1:8001',
   'http://localhost:8002',
-  'http://127.0.0.1:8002'
+  'http://127.0.0.1:8002',
+  'http://localhost:8004',
+  'http://127.0.0.1:8004'
 ]);
-
 function getInitialApiBase() {
   const queryApi = new URLSearchParams(window.location.search).get('api');
   if (queryApi) {
@@ -659,6 +658,10 @@ function getInitialApiBase() {
   return saved;
 }
 
+// Force reset to port 8000 if stuck on old port
+if ((localStorage.getItem('igraph_api') || '').includes('8004')) {
+  localStorage.removeItem('igraph_api');
+}
 let API_BASE = getInitialApiBase();
 let dashData = null;
 let allRisks = [];
@@ -812,9 +815,11 @@ async function activateSelectedSlice() {
     });
     if (!r.ok) throw new Error(await r.text());
     const payload = await r.json();
+    const wasCached = !!payload.slice?.cached;
+    const reusedRuntime = !!payload.activation?.reused_runtime;
     setDatasetStatus(
       'dataset-activation-status',
-      `Active slice: ${payload.project}. ${payload.slice.stats?.total_issues || '—'} issues, ${payload.slice.stats?.total_dependencies || '—'} dependencies. Backend mode: ${payload.activation?.db_mode || currentDbMode}.`,
+      `Active slice: ${payload.project}. ${payload.slice.stats?.total_issues || '—'} issues, ${payload.slice.stats?.total_dependencies || '—'} dependencies. Backend mode: ${payload.activation?.db_mode || currentDbMode}.${wasCached ? ' Reused prepared slice.' : ''}${reusedRuntime ? ' Reused running pipeline.' : ''}`,
       'success'
     );
     await checkHealth();
@@ -1153,6 +1158,13 @@ async function sendQuery() {
       response = data.message;
     } else {
       response = JSON.stringify(data, null, 2).substring(0, 500) + '…';
+    }
+    // Show agentic execution path if present
+    if (data._agent_execution_path?.length) {
+      response += '\n\n🔗 **Agent path:** ' + data._agent_execution_path.join(' → ');
+    }
+    if (data._rag_used) {
+      response += `\n📚 **RAG:** ${data._rag_context_size} docs retrieved`;
     }
     addMessage('assistant', response);
   } catch(e) {

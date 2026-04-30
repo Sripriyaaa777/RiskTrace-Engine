@@ -8,6 +8,8 @@ The project now supports:
 - real Apache Jira BSON preprocessing
 - user-uploaded Jira-like datasets with project-slice selection
 - transformer-based prediction using `distilroberta-base`
+- local RAG retrieval with a persisted TF-IDF index
+- agentic multi-step routing with planning / decision / critic stages
 - optional Groq-powered LLM explanations
 - CSV-backed runtime and Neo4j graph loading support
 
@@ -34,6 +36,8 @@ RiskTrace has four main layers:
 
 4. Decision support
 - Run counterfactual simulations like "what happens if I fix this issue now?"
+- Retrieve related issue context via local RAG
+- Dynamically route through an agentic reasoning loop
 - Optionally explain findings using a Groq-hosted LLM
 
 ## Current Models Used
@@ -51,6 +55,15 @@ RiskTrace has four main layers:
 ### Optional LLM explanation model
 - Groq model: `llama-3.3-70b-versatile`
 - Role: summaries, explanations, recommendations, chat
+
+### Current RAG backend
+- Backend: `local_tfidf`
+- Role: retrieve relevant issue / pattern documents without external model download
+
+### Current agentic orchestration
+- Runtime: `RiskTraceAgenticPipeline`
+- Stages: `perception -> rag_retrieval -> planning -> issue_detail/decision -> critic`
+- Role: dynamically route reasoning instead of using one fixed call chain
 
 This means the project is best described as:
 
@@ -79,6 +92,10 @@ LogisticRegression classifier
     ->
 Predictive validation metrics
     ->
+Local RAG retrieval (TF-IDF)
+    ->
+Agentic planning / decision / critic routing
+    ->
 Optional Groq LLM explanation layer
 ```
 
@@ -92,7 +109,9 @@ RiskTrace-Engine-main/
 ├── predictive_model.py       Transformer-based predictive training pipeline
 ├── predictive_analysis.py    Historical replay and predictive validation
 ├── risk_engine.py            Core dependency risk propagation
-├── agents.py                 Agent orchestration and explanation logic
+├── agents.py                 Base agents and classic orchestration
+├── agentic_pipeline.py       Agentic LangGraph-style orchestration layer
+├── rag_engine.py             Local persisted TF-IDF RAG backend
 ├── csv_db.py                 CSV graph backend
 ├── build_graph.py            Neo4j graph loader
 ├── issuegraph_ui.html        Single-file dashboard UI
@@ -116,6 +135,8 @@ RiskTrace-Engine-main/
 - Transformer-enhanced predictive delay detection
 - Cross-validation and temporal holdout evaluation
 - Dataset-driven UI workflow for upload → slice selection → activation
+- Cached slice reuse for faster repeat activation
+- Background RAG refresh so API startup is not blocked
 
 ## Installation
 
@@ -286,6 +307,17 @@ The Settings modal now supports:
 - `Back to Dashboard`
 - automatic return to the dashboard after successful activation
 
+### Slice activation performance
+
+To keep repeated activations fast, the runtime now:
+- reuses already prepared slice CSVs when the same dataset/project/options are selected
+- skips a full runtime rebuild when the exact same active slice is selected again
+- refreshes RAG in the background instead of blocking server startup
+
+This means:
+- first activation of a brand-new slice is still heavier
+- reactivating an already prepared slice is much faster than before
+
 ### New dataset endpoints
 
 | Method | Route | Description |
@@ -395,6 +427,8 @@ Returns:
 | Method | Route | Description |
 |---|---|---|
 | GET | `/health` | Health check and active DB mode |
+| GET | `/rag-status` | Live RAG backend status |
+| GET | `/agent-trace` | Agentic execution path and RAG usage proof |
 | GET | `/dashboard` | Dashboard summary, top risks, action plan |
 | GET | `/risk/{issue_id}` | Risk details for a single issue |
 | GET | `/graph/{issue_id}` | Issue-centered dependency graph |
@@ -493,7 +527,71 @@ This powers:
 - recommendations
 - natural language chat
 
-Without Groq, the core graph engine, predictive model, and counterfactual simulation still work.
+Without Groq, the core graph engine, predictive model, counterfactual simulation, and RAG-backed retrieval still work. The system falls back to structured outputs instead of natural-language summaries.
+
+## RAG and Agentic Verification
+
+The final working runtime can be verified directly from the API:
+
+### Health
+
+```bash
+curl http://127.0.0.1:8004/health
+```
+
+Look for:
+
+```json
+{
+  "pipeline_type": "RiskTraceAgenticPipeline",
+  "rag_ready": true
+}
+```
+
+### RAG status
+
+```bash
+curl http://127.0.0.1:8004/rag-status
+```
+
+Expected shape:
+
+```json
+{
+  "ready": true,
+  "backend": "local_tfidf",
+  "count": 304
+}
+```
+
+### Agentic execution trace
+
+```bash
+curl "http://127.0.0.1:8004/agent-trace?query=Why%20is%20HADOOP-8%20high%20risk%3F"
+```
+
+Expected shape:
+
+```json
+{
+  "execution_path": [
+    "perception",
+    "rag_retrieval",
+    "planning",
+    "issue_detail",
+    "decision",
+    "critic"
+  ],
+  "rag_used": true,
+  "rag_docs_retrieved": 5
+}
+```
+
+This proves:
+- the agentic routing path is active
+- RAG retrieval is active
+- the critic stage is active
+- the app is not falling back to the old fixed pipeline
 
 ## Neo4j Support
 
