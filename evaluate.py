@@ -436,8 +436,8 @@ def main():
     args = parser.parse_args()
 
     # Connect
-    from scripts.build_graph import GraphDB
-    from agents.agents import AgentPipeline
+    from build_graph import GraphDB
+    from agents import AgentPipeline
 
     db = GraphDB(
         uri      = os.getenv("NEO4J_URI", "bolt://localhost:7687"),

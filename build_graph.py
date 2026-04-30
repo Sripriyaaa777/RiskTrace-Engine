@@ -2,11 +2,12 @@
 Loads processed CSV data into Neo4j graph database.
 
 Usage:
-    python scripts/build_graph.py
+    python build_graph.py
 """
 
 import os
 import csv
+import logging
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
@@ -18,6 +19,13 @@ PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
 ISSUES_CSV = os.getenv("ISSUES_CSV", "data/processed/issues.csv")
 DEPS_CSV   = os.getenv("DEPS_CSV", "data/processed/dependencies.csv")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
 
 
 class GraphDB:
@@ -33,11 +41,14 @@ class GraphDB:
 
 
 def load_issues(db):
-    print("Loading issues into Neo4j...")
+    log.info("[stage:graph] Loading issues into Neo4j")
 
     with open(ISSUES_CSV, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            payload = dict(row)
+            payload["is_delayed"] = str(payload.get("is_delayed", "")).strip().lower() in {"true", "1", "yes"}
+            payload["delay_days"] = float(payload["delay_days"]) if payload.get("delay_days") not in ("", None) else None
             db.run(
                 """
                 MERGE (i:Issue {issue_id: $issue_id})
@@ -53,12 +64,12 @@ def load_issues(db):
                     i.delay_days  = $delay_days,
                     i.is_delayed  = $is_delayed
                 """,
-                row
+                payload
             )
 
 
 def load_dependencies(db):
-    print("Loading dependencies...")
+    log.info("[stage:graph] Loading dependencies into Neo4j")
 
     with open(DEPS_CSV, encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -67,14 +78,24 @@ def load_dependencies(db):
                 """
                 MATCH (a:Issue {issue_id: $source})
                 MATCH (b:Issue {issue_id: $target})
-                MERGE (a)-[:DEPENDS_ON]->(b)
+                MERGE (a)-[r:DEPENDS_ON]->(b)
+                SET r.link_type = $link_type,
+                    r.direction = $direction,
+                    r.confidence = CASE
+                        WHEN $confidence IS NULL OR $confidence = '' THEN NULL
+                        ELSE toFloat($confidence)
+                    END,
+                    r.inferred = CASE
+                        WHEN toLower(coalesce($inferred, 'false')) IN ['true', '1', 'yes'] THEN true
+                        ELSE false
+                    END
                 """,
                 row
             )
 
 
 def clear_db(db):
-    print("Clearing existing database...")
+    log.info("[stage:graph] Clearing existing database")
     db.run("MATCH (n) DETACH DELETE n")
 
 
@@ -85,7 +106,7 @@ def main():
     load_issues(db)
     load_dependencies(db)
 
-    print("✅ Graph loaded into Neo4j successfully!")
+    log.info("Graph loaded into Neo4j successfully")
     db.close()
 
 

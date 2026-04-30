@@ -21,7 +21,6 @@ import json
 import csv
 import argparse
 import logging
-import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,16 +58,25 @@ STATUS_MAP = {
     # Anything not listed → treated as "Unknown" (filtered out later)
 }
 
-# Link types in Jira that represent a true task dependency.
-# "relates to" and "duplicates" are intentionally excluded —
-# they do not represent a blocking/ordering relationship.
-DEPENDENCY_LINK_TYPES = {
-    "blocks",
-    "is blocked by",
+# Descriptor phrases that mean the current issue depends on the linked issue.
+# We normalise every extracted edge to:
+#   source -> target   where source depends on target
+CURRENT_DEPENDS_DESCRIPTORS = {
     "depends on",
-    "is depended on by",
-    "cloners",          # cloned issue often has inherited dependency
+    "is blocked by",
+    "requires",
+    "needs",
 }
+
+# Descriptor phrases that mean the linked issue depends on the current issue.
+OTHER_DEPENDS_ON_CURRENT_DESCRIPTORS = {
+    "blocks",
+    "is depended on by",
+}
+
+SOFT_DEPENDENCY_PATTERNS = [
+    re.compile(r"\b(?:blocked by|depends on|requires|waiting for|after)\s+([A-Z][A-Z0-9]+-\d+)\b", re.IGNORECASE),
+]
 
 # ISO 8601 date formats we may encounter in the dataset
 DATE_FORMATS = [
@@ -77,6 +85,8 @@ DATE_FORMATS = [
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%d",
 ]
+
+ISSUE_REF_RE = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
 
 
 # ─────────────────────────────────────────────
@@ -87,6 +97,8 @@ def parse_date(raw: Optional[str]) -> Optional[datetime]:
     """Attempt to parse a date string into a timezone-aware datetime."""
     if not raw:
         return None
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
     for fmt in DATE_FORMATS:
         try:
             dt = datetime.strptime(raw, fmt)
@@ -137,153 +149,293 @@ def parse_issue(raw: dict) -> Optional[dict]:
     Returns None if the issue is missing required fields (id, summary).
     The Apache dataset wraps most fields inside a 'fields' key.
     """
-    fields = raw.get("fields", raw)   # handle both flat and nested layouts
+    try:
+        if not isinstance(raw, dict):
+            return None
+        fields = raw.get("fields", raw)   # handle both flat and nested layouts
+        if not isinstance(fields, dict):
+            return None
 
-    issue_id = (
-        raw.get("key")
-        or raw.get("id")
-        or fields.get("key")
-        or fields.get("id")
-    )
-    if not issue_id:
+        issue_id = (
+            raw.get("key")
+            or raw.get("id")
+            or fields.get("key")
+            or fields.get("id")
+        )
+        if not issue_id:
+            return None
+
+        summary = fields.get("summary") or fields.get("title") or ""
+        if not str(summary).strip():
+            return None
+        description = fields.get("description") or fields.get("body") or ""
+        if isinstance(description, dict):
+            description = json.dumps(description)
+
+        # Status
+        status_raw = None
+        s = fields.get("status")
+        if isinstance(s, dict):
+            status_raw = s.get("name")
+        elif isinstance(s, str):
+            status_raw = s
+        status = normalise_status(status_raw)
+
+        # Skip issues we cannot reason about
+        if status == "Unknown":
+            return None
+
+        # Priority
+        priority_raw = fields.get("priority")
+        priority = "Medium"
+        if isinstance(priority_raw, dict):
+            priority = priority_raw.get("name", "Medium")
+        elif isinstance(priority_raw, str):
+            priority = priority_raw
+
+        # Timestamps
+        created     = parse_date(fields.get("created"))
+        updated     = parse_date(fields.get("updated"))
+        resolved    = parse_date(fields.get("resolutiondate") or fields.get("resolved"))
+        due_date    = parse_date(fields.get("duedate") or fields.get("due_date"))
+
+        # Project key
+        project_raw = fields.get("project")
+        project = ""
+        if isinstance(project_raw, dict):
+            project = project_raw.get("key", "")
+        elif isinstance(project_raw, str):
+            project = project_raw
+        if not project and "-" in str(issue_id):
+            project = str(issue_id).split("-")[0]
+
+        # Assignee
+        assignee_raw = fields.get("assignee")
+        assignee = ""
+        if isinstance(assignee_raw, dict):
+            assignee = assignee_raw.get("displayName") or assignee_raw.get("name", "")
+        elif isinstance(assignee_raw, str):
+            assignee = assignee_raw
+
+        delay_days = compute_delay_days(due_date, resolved or updated, status)
+
+        # Is this issue at risk?
+        is_delayed = (
+            (delay_days is not None and delay_days > 0 and status != "Done")
+            or status == "Blocked"
+        )
+
+        return {
+            "issue_id":    str(issue_id),
+            "project":     project,
+            "summary":     str(summary)[:200],
+            "description": str(description)[:2000],
+            "status":      status,
+            "priority":    priority,
+            "assignee":    assignee,
+            "created":     created.isoformat() if created else "",
+            "updated":     updated.isoformat() if updated else "",
+            "resolved":    resolved.isoformat() if resolved else "",
+            "due_date":    due_date.isoformat() if due_date else "",
+            "delay_days":  delay_days if delay_days is not None else "",
+            "is_delayed":  is_delayed,
+        }
+    except Exception as exc:
+        log.warning("Malformed issue record skipped: %s", exc)
         return None
 
-    summary = fields.get("summary") or fields.get("title") or ""
-    if not summary.strip():
-        return None
 
-    # Status
-    status_raw = None
-    s = fields.get("status")
-    if isinstance(s, dict):
-        status_raw = s.get("name")
-    elif isinstance(s, str):
-        status_raw = s
-    status = normalise_status(status_raw)
+def _normalise_link_phrase(value: Optional[str]) -> str:
+    return str(value or "").strip().lower()
 
-    # Skip issues we cannot reason about
-    if status == "Unknown":
-        return None
 
-    # Priority
-    priority_raw = fields.get("priority")
-    priority = "Medium"
-    if isinstance(priority_raw, dict):
-        priority = priority_raw.get("name", "Medium")
-    elif isinstance(priority_raw, str):
-        priority = priority_raw
-
-    # Timestamps
-    created     = parse_date(fields.get("created"))
-    updated     = parse_date(fields.get("updated"))
-    resolved    = parse_date(fields.get("resolutiondate") or fields.get("resolved"))
-    due_date    = parse_date(fields.get("duedate") or fields.get("due_date"))
-
-    # Project key
-    project_raw = fields.get("project")
-    project = ""
-    if isinstance(project_raw, dict):
-        project = project_raw.get("key", "")
-    elif isinstance(project_raw, str):
-        project = project_raw
-    if not project and "-" in str(issue_id):
-        project = str(issue_id).split("-")[0]
-
-    # Assignee
-    assignee_raw = fields.get("assignee")
-    assignee = ""
-    if isinstance(assignee_raw, dict):
-        assignee = assignee_raw.get("displayName") or assignee_raw.get("name", "")
-    elif isinstance(assignee_raw, str):
-        assignee = assignee_raw
-
-    delay_days = compute_delay_days(due_date, updated, status)
-
-    # Is this issue at risk?
-    is_delayed = (
-        (delay_days is not None and delay_days > 0 and status != "Done")
-        or status == "Blocked"
-    )
-
+def _build_edge(
+    source: str,
+    target: str,
+    link_type: str,
+    direction: str,
+    confidence: float = 1.0,
+    inferred: bool = False,
+) -> dict:
     return {
-        "issue_id":    str(issue_id),
-        "project":     project,
-        "summary":     summary[:200],          # cap length for storage
-        "status":      status,
-        "priority":    priority,
-        "assignee":    assignee,
-        "created":     created.isoformat() if created else "",
-        "updated":     updated.isoformat() if updated else "",
-        "resolved":    resolved.isoformat() if resolved else "",
-        "due_date":    due_date.isoformat() if due_date else "",
-        "delay_days":  delay_days if delay_days is not None else "",
-        "is_delayed":  is_delayed,
+        "source": source,
+        "target": target,
+        "link_type": link_type,
+        "direction": direction,
+        "confidence": round(confidence, 3),
+        "inferred": inferred,
     }
 
 
-def parse_dependencies(raw: dict) -> list[dict]:
+def parse_dependencies(raw: dict, include_subtasks: bool = False) -> list[dict]:
     """
     Extract dependency edges from a raw Jira issue's issuelinks field.
 
-    Returns a list of {source, target, link_type} dicts.
-    We keep only links in DEPENDENCY_LINK_TYPES (blocking relationships).
+        Returns a list of dependency edges where source depends on target.
+    We keep only strong dependency semantics and ignore weak relations
+    like "relates to" or "duplicates".
     """
-    fields = raw.get("fields", raw)
-    issue_id = raw.get("key") or raw.get("id") or fields.get("key") or fields.get("id")
-    if not issue_id:
+    try:
+        if not isinstance(raw, dict):
+            return []
+        fields = raw.get("fields", raw)
+        if not isinstance(fields, dict):
+            return []
+        issue_id = raw.get("key") or raw.get("id") or fields.get("key") or fields.get("id")
+        if not issue_id:
+            return []
+
+        links = fields.get("issuelinks") or fields.get("issue_links") or []
+        edges = []
+
+        for link in links:
+            if not isinstance(link, dict):
+                continue
+
+            link_type_raw = link.get("type", {})
+            link_name = ""
+            outward_desc = ""
+            inward_desc = ""
+            if isinstance(link_type_raw, dict):
+                link_name = _normalise_link_phrase(link_type_raw.get("name"))
+                outward_desc = _normalise_link_phrase(link_type_raw.get("outward"))
+                inward_desc = _normalise_link_phrase(link_type_raw.get("inward"))
+            else:
+                link_name = _normalise_link_phrase(link_type_raw)
+
+            # Outward link: current issue → other (e.g. "blocks" another issue)
+            outward = link.get("outwardIssue") or link.get("outward_issue")
+            if isinstance(outward, dict):
+                other_id = outward.get("key") or outward.get("id")
+                if other_id:
+                    if outward_desc in CURRENT_DEPENDS_DESCRIPTORS or link_name in CURRENT_DEPENDS_DESCRIPTORS:
+                        edges.append(_build_edge(str(issue_id), str(other_id), outward_desc or link_name, "outward"))
+                    elif outward_desc in OTHER_DEPENDS_ON_CURRENT_DESCRIPTORS or link_name in OTHER_DEPENDS_ON_CURRENT_DESCRIPTORS:
+                        edges.append(_build_edge(str(other_id), str(issue_id), outward_desc or link_name, "outward"))
+
+            # Inward link: other issue → current (e.g. "is blocked by")
+            inward = link.get("inwardIssue") or link.get("inward_issue")
+            if isinstance(inward, dict):
+                other_id = inward.get("key") or inward.get("id")
+                if other_id:
+                    if inward_desc in CURRENT_DEPENDS_DESCRIPTORS or link_name in CURRENT_DEPENDS_DESCRIPTORS:
+                        edges.append(_build_edge(str(issue_id), str(other_id), inward_desc or link_name, "inward"))
+                    elif inward_desc in OTHER_DEPENDS_ON_CURRENT_DESCRIPTORS or link_name in OTHER_DEPENDS_ON_CURRENT_DESCRIPTORS:
+                        edges.append(_build_edge(str(other_id), str(issue_id), inward_desc or link_name, "inward"))
+
+        if include_subtasks:
+            for subtask in fields.get("subtasks") or []:
+                if isinstance(subtask, dict):
+                    sub_id = subtask.get("key") or subtask.get("id")
+                    if sub_id:
+                        # Treat subtasks as a weaker hierarchical dependency.
+                        edges.append(_build_edge(str(sub_id), str(issue_id), "subtask_of", "hierarchy", 0.7, False))
+
+        return edges
+    except Exception as exc:
+        log.warning("Malformed dependency record skipped: %s", exc)
         return []
 
-    links = fields.get("issuelinks") or fields.get("issue_links") or []
-    edges = []
 
-    for link in links:
-        if not isinstance(link, dict):
+def infer_text_dependencies(issue: dict, valid_ids: set[str]) -> list[dict]:
+    """
+    Infer soft dependencies from issue text such as:
+      "blocked by HADOOP-123" or "depends on SPARK-77"
+    These edges are lower confidence than explicit Jira links.
+    """
+    text = " ".join(
+        part for part in [issue.get("summary", ""), issue.get("description", "")]
+        if part
+    )
+    current_id = issue.get("issue_id")
+    inferred = []
+    for pattern in SOFT_DEPENDENCY_PATTERNS:
+        for match in pattern.finditer(text):
+            ref = match.group(1).upper()
+            if ref == current_id or ref not in valid_ids:
+                continue
+            inferred.append(
+                _build_edge(current_id, ref, "inferred_depends_on", "inferred", 0.55, True)
+            )
+    return inferred
+
+
+def augment_sparse_dependencies(
+    issues: list[dict],
+    dependencies: list[dict],
+    similarity_threshold: float = 0.3,
+    max_inferred_per_issue: int = 3,
+) -> list[dict]:
+    """
+    Infer soft edges for isolated issues using text similarity plus assignee/project checks.
+    These are explicitly marked as inferred and lower-confidence.
+    """
+    if not issues:
+        return []
+
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity
+    except ImportError:
+        log.warning("scikit-learn unavailable; skipping sparse dependency augmentation")
+        return []
+
+    dep_counts: dict[str, int] = {}
+    for edge in dependencies:
+        dep_counts[edge["source"]] = dep_counts.get(edge["source"], 0) + 1
+
+    texts = [
+        " ".join(
+            part for part in [issue.get("summary", ""), issue.get("description", "")]
+            if part
+        )
+        for issue in issues
+    ]
+    if not any(texts):
+        return []
+
+    tfidf = TfidfVectorizer(max_features=500, stop_words="english")
+    sim_matrix = cosine_similarity(tfidf.fit_transform(texts))
+
+    inferred = []
+    existing_pairs = {(edge["source"], edge["target"]) for edge in dependencies}
+    for idx, issue in enumerate(issues):
+        current_id = issue["issue_id"]
+        if dep_counts.get(current_id, 0) > 0:
             continue
 
-        link_type_raw = link.get("type", {})
-        if isinstance(link_type_raw, dict):
-            link_name = (
-                link_type_raw.get("name", "")
-                or link_type_raw.get("outward", "")
-            ).lower().strip()
-        else:
-            link_name = str(link_type_raw).lower().strip()
+        candidates = []
+        for jdx, other in enumerate(issues):
+            if idx == jdx:
+                continue
+            if other["issue_id"] == current_id:
+                continue
+            score = float(sim_matrix[idx][jdx])
+            if score < similarity_threshold:
+                continue
+            same_assignee = bool(issue.get("assignee")) and issue.get("assignee") == other.get("assignee")
+            same_project = issue.get("project") == other.get("project")
+            if not (same_assignee or same_project):
+                continue
+            candidates.append((score, other["issue_id"]))
 
-        if link_name not in DEPENDENCY_LINK_TYPES:
-            continue
+        for score, target_id in sorted(candidates, reverse=True)[:max_inferred_per_issue]:
+            pair = (current_id, target_id)
+            if pair in existing_pairs:
+                continue
+            inferred.append(
+                _build_edge(current_id, target_id, "augmented_soft_depends_on", "augmented", min(0.8, 0.35 + score), True)
+            )
+            existing_pairs.add(pair)
 
-        # Outward link: current issue → other (e.g. "blocks" another issue)
-        outward = link.get("outwardIssue") or link.get("outward_issue")
-        if outward:
-            target_id = outward.get("key") or outward.get("id")
-            if target_id:
-                edges.append({
-                    "source":    str(issue_id),
-                    "target":    str(target_id),
-                    "link_type": link_name,
-                    "direction": "outward",
-                })
-
-        # Inward link: other issue → current (e.g. "is blocked by")
-        inward = link.get("inwardIssue") or link.get("inward_issue")
-        if inward:
-            source_id = inward.get("key") or inward.get("id")
-            if source_id:
-                edges.append({
-                    "source":    str(source_id),
-                    "target":    str(issue_id),
-                    "link_type": link_name,
-                    "direction": "inward",
-                })
-
-    return edges
+    return inferred
 
 
 # ─────────────────────────────────────────────
 # Dataset loader (handles multiple raw formats)
 # ─────────────────────────────────────────────
 
-def load_raw_issues(path: Path) -> list[dict]:
+def load_raw_issues(path: Path):
     """
     Load raw issues from a file.
     Handles:
@@ -294,41 +446,56 @@ def load_raw_issues(path: Path) -> list[dict]:
     log.info("Loading raw data from %s", path)
     suffix = path.suffix.lower()
 
+    if suffix == ".bson":
+        try:
+            from bson import decode_file_iter
+        except ImportError as exc:
+            raise ImportError(
+                "BSON support requires the `bson` module. Install dependencies from requirements.txt."
+            ) from exc
+        with open(path, "rb") as f:
+            for doc in decode_file_iter(f):
+                yield doc
+        return
+
     if suffix in (".json", ".jsonl"):
         with open(path, encoding="utf-8") as f:
             content = f.read().strip()
 
         # JSONL — one object per line
         if content.startswith("{") and "\n" in content:
-            issues = []
             for line in content.splitlines():
                 line = line.strip()
                 if line:
                     try:
-                        issues.append(json.loads(line))
+                        yield json.loads(line)
                     except json.JSONDecodeError:
                         continue
-            return issues
+            return
 
         # Standard JSON
         data = json.loads(content)
         if isinstance(data, list):
-            return data
+            for item in data:
+                yield item
+            return
         if isinstance(data, dict):
             # Try common wrapper keys
             for key in ("issues", "data", "items", "results"):
                 if key in data and isinstance(data[key], list):
-                    return data[key]
+                    for item in data[key]:
+                        yield item
+                    return
             # Single issue wrapped in a dict
-            return [data]
+            yield data
+            return
 
     elif suffix == ".csv":
-        issues = []
         with open(path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                issues.append(dict(row))
-        return issues
+                yield dict(row)
+        return
 
     raise ValueError(f"Unsupported file format: {suffix}")
 
@@ -390,6 +557,7 @@ def generate_synthetic_dataset(n_issues: int = 200) -> tuple[list[dict], list[di
             "issue_id":   issue_id,
             "project":    project,
             "summary":    f"Task {i}: implement {random.choice(['feature','fix','refactor','test','deploy'])} module {i}",
+            "description": f"{issue_id} tracks implementation work for module {i}.",
             "status":     status,
             "priority":   random.choice(priorities),
             "assignee":   f"user_{random.randint(1, 15)}",
@@ -410,7 +578,7 @@ def generate_synthetic_dataset(n_issues: int = 200) -> tuple[list[dict], list[di
     for i in range(1, min(40, n_issues)):
         src, tgt = ids[i], ids[i - 1]
         if (src, tgt) not in seen_edges:
-            deps.append({"source": src, "target": tgt, "link_type": "blocks", "direction": "outward"})
+            deps.append(_build_edge(src, tgt, "blocks", "outward", 1.0, False))
             seen_edges.add((src, tgt))
 
     # Fan-out: some central nodes block many others
@@ -419,14 +587,14 @@ def generate_synthetic_dataset(n_issues: int = 200) -> tuple[list[dict], list[di
         targets = random.sample([x for x in ids if x != hub], k=random.randint(2, 5))
         for t in targets:
             if (hub, t) not in seen_edges:
-                deps.append({"source": hub, "target": t, "link_type": "blocks", "direction": "outward"})
+                deps.append(_build_edge(hub, t, "blocks", "outward", 1.0, False))
                 seen_edges.add((hub, t))
 
     # Random additional edges
     for _ in range(min(50, n_issues // 4)):
         src, tgt = random.sample(ids, 2)
         if (src, tgt) not in seen_edges:
-            deps.append({"source": src, "target": tgt, "link_type": "depends on", "direction": "outward"})
+            deps.append(_build_edge(src, tgt, "depends on", "outward", 1.0, False))
             seen_edges.add((src, tgt))
 
     return issues, deps
@@ -456,10 +624,16 @@ def compute_stats(issues: list[dict], dependencies: list[dict]) -> dict:
     for d in dependencies:
         in_degree[d["target"]] = in_degree.get(d["target"], 0) + 1
     in_degrees = list(in_degree.values())
+    explicit_deps = [d for d in dependencies if not d.get("inferred")]
+    inferred_deps = [d for d in dependencies if d.get("inferred")]
+    source_with_deps = {d["source"] for d in dependencies}
 
     return {
         "total_issues":             len(issues),
         "total_dependencies":       len(dependencies),
+        "explicit_dependencies":    len(explicit_deps),
+        "inferred_dependencies":    len(inferred_deps),
+        "dependency_coverage_pct":  round(len(source_with_deps) / max(len(issues), 1) * 100, 1),
         "status_distribution":      {s: statuses.count(s) for s in set(statuses)},
         "delayed_issues":           len(delayed),
         "delayed_percentage":       round(len(delayed) / max(len(issues), 1) * 100, 1),
@@ -483,6 +657,8 @@ def run_pipeline(
     max_issues: int,
     project_filter: Optional[str],
     synthetic: bool,
+    include_subtasks: bool,
+    augment_soft_deps: bool,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     issues_out  = output_dir / "issues.csv"
@@ -490,19 +666,22 @@ def run_pipeline(
     stats_out   = output_dir / "stats.json"
 
     # ── Step 1: Load ──────────────────────────────────────────────────
+    log.info("[stage:load] Starting dataset load")
     if synthetic or input_path is None:
         log.info("Generating synthetic dataset with %d issues …", max_issues)
         issues, dependencies = generate_synthetic_dataset(max_issues)
     else:
         raw_issues = load_raw_issues(input_path)
-        log.info("Loaded %d raw records", len(raw_issues))
 
         # ── Step 2: Parse & normalise ─────────────────────────────────
+        log.info("[stage:preprocess] Parsing and normalising issues")
         issues = []
         dependencies = []
         skipped = 0
+        loaded = 0
 
         for raw in raw_issues:
+            loaded += 1
             parsed = parse_issue(raw)
             if parsed is None:
                 skipped += 1
@@ -513,12 +692,27 @@ def run_pipeline(
                 continue
 
             issues.append(parsed)
-            dependencies.extend(parse_dependencies(raw))
+            dependencies.extend(parse_dependencies(raw, include_subtasks=include_subtasks))
+
+            if project_filter and len(issues) >= max_issues:
+                log.info(
+                    "Reached max_issues=%d for project %s; stopping early during streamed import",
+                    max_issues, project_filter,
+                )
+                break
 
         log.info(
-            "Parsed %d valid issues, %d skipped, %d dependency edges found",
-            len(issues), skipped, len(dependencies),
+            "Loaded %d raw records; parsed %d valid issues, %d skipped, %d dependency edges found",
+            loaded, len(issues), skipped, len(dependencies),
         )
+
+        log.info("[stage:preprocess] Inferring soft dependencies from issue text")
+        valid_ids_pre_subset = {i["issue_id"] for i in issues}
+        inferred_edges = []
+        for issue in issues:
+            inferred_edges.extend(infer_text_dependencies(issue, valid_ids_pre_subset))
+        dependencies.extend(inferred_edges)
+        log.info("Inferred %d text-based dependency edges", len(inferred_edges))
 
         # ── Step 3: Subset ────────────────────────────────────────────
         # Prioritise delayed/blocked issues so the graph has interesting risk signals.
@@ -541,19 +735,32 @@ def run_pipeline(
             before, len(dependencies),
         )
 
+    if augment_soft_deps:
+        log.info("[stage:preprocess] Augmenting sparse dependency graph with inferred soft edges")
+        augmented_edges = augment_sparse_dependencies(issues, dependencies)
+        dependencies.extend(augmented_edges)
+        log.info("Added %d augmented soft dependency edges", len(augmented_edges))
+
     # ── Step 4: De-duplicate dependencies ─────────────────────────────
-    seen = set()
-    unique_deps = []
+    log.info("[stage:preprocess] De-duplicating dependency edges")
+    deduped_by_pair: dict[tuple[str, str], dict] = {}
     for d in dependencies:
         key = (d["source"], d["target"])
-        if key not in seen:
-            seen.add(key)
-            unique_deps.append(d)
-    dependencies = unique_deps
+        existing = deduped_by_pair.get(key)
+        if existing is None:
+            deduped_by_pair[key] = d
+            continue
+
+        existing_score = (0 if existing.get("inferred") else 2, float(existing.get("confidence", 0)))
+        current_score = (0 if d.get("inferred") else 2, float(d.get("confidence", 0)))
+        if current_score > existing_score:
+            deduped_by_pair[key] = d
+    dependencies = list(deduped_by_pair.values())
 
     # ── Step 5: Write CSVs ────────────────────────────────────────────
+    log.info("[stage:preprocess] Writing processed CSV outputs")
     issue_fields = [
-        "issue_id", "project", "summary", "status", "priority",
+        "issue_id", "project", "summary", "description", "status", "priority",
         "assignee", "created", "updated", "resolved",
         "due_date", "delay_days", "is_delayed",
     ]
@@ -562,7 +769,7 @@ def run_pipeline(
         writer.writeheader()
         writer.writerows(issues)
 
-    dep_fields = ["source", "target", "link_type", "direction"]
+    dep_fields = ["source", "target", "link_type", "direction", "confidence", "inferred"]
     with open(deps_out, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=dep_fields)
         writer.writeheader()
@@ -605,6 +812,12 @@ def main():
         help="Output directory (default: data/processed)",
     )
     parser.add_argument(
+        "--output-dir",
+        dest="output",
+        type=Path,
+        help="Alias for --output to support older docs/scripts",
+    )
+    parser.add_argument(
         "--max-issues", "-n",
         type=int,
         default=300,
@@ -621,6 +834,16 @@ def main():
         action="store_true",
         help="Ignore --input and generate a synthetic dataset instead",
     )
+    parser.add_argument(
+        "--include-subtasks",
+        action="store_true",
+        help="Treat Jira subtasks as weaker hierarchical dependencies",
+    )
+    parser.add_argument(
+        "--augment-soft-deps",
+        action="store_true",
+        help="Augment sparse graphs using inferred soft dependencies from text similarity",
+    )
     args = parser.parse_args()
 
     run_pipeline(
@@ -629,6 +852,8 @@ def main():
         max_issues=args.max_issues,
         project_filter=args.project,
         synthetic=args.synthetic,
+        include_subtasks=args.include_subtasks,
+        augment_soft_deps=args.augment_soft_deps,
     )
 
 
