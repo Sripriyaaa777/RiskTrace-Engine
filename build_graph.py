@@ -40,10 +40,10 @@ class GraphDB:
             return list(session.run(query, params or {}))
 
 
-def load_issues(db):
+def load_issues(db, issues_csv: str = ISSUES_CSV):
     log.info("[stage:graph] Loading issues into Neo4j")
 
-    with open(ISSUES_CSV, encoding="utf-8") as f:
+    with open(issues_csv, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             payload = dict(row)
@@ -68,10 +68,10 @@ def load_issues(db):
             )
 
 
-def load_dependencies(db):
+def load_dependencies(db, deps_csv: str = DEPS_CSV):
     log.info("[stage:graph] Loading dependencies into Neo4j")
 
-    with open(DEPS_CSV, encoding="utf-8") as f:
+    with open(deps_csv, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             db.run(
@@ -99,12 +99,16 @@ def clear_db(db):
     db.run("MATCH (n) DETACH DELETE n")
 
 
+def rebuild_graph(db, issues_csv: str = ISSUES_CSV, deps_csv: str = DEPS_CSV):
+    clear_db(db)
+    load_issues(db, issues_csv=issues_csv)
+    load_dependencies(db, deps_csv=deps_csv)
+
+
 def main():
     db = GraphDB(URI, USER, PASSWORD)
 
-    clear_db(db)
-    load_issues(db)
-    load_dependencies(db)
+    rebuild_graph(db, issues_csv=ISSUES_CSV, deps_csv=DEPS_CSV)
 
     log.info("Graph loaded into Neo4j successfully")
     db.close()

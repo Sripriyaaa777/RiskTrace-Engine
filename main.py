@@ -21,11 +21,12 @@ Usage:
 import logging
 import os
 import sys
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -69,6 +70,13 @@ def create_db():
 _db = None
 _pipeline = None
 _db_mode = "uninitialised"
+_active_dataset = {
+    "dataset_id": None,
+    "dataset_name": "Synthetic demo dataset" if os.getenv("ISSUES_CSV", "").endswith("processed/issues.csv") else "Custom dataset",
+    "project": None,
+    "issues_path": os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
+    "deps_path": os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
+}
 
 
 @asynccontextmanager
@@ -90,6 +98,8 @@ async def lifespan(app: FastAPI):
             poll_interval  = int(os.getenv("MONITOR_INTERVAL", "60")),
         )
         _pipeline.start_monitoring()
+        _active_dataset["issues_path"] = os.getenv("ISSUES_CSV", "data/processed/issues.csv")
+        _active_dataset["deps_path"] = os.getenv("DEPS_CSV", "data/processed/dependencies.csv")
         log.info("IssueGraphAgent++ ready  [mode: %s]", _db_mode)
     except Exception as e:
         log.error("Startup failed: %s", e, exc_info=True)
@@ -122,6 +132,75 @@ class CounterfactualRequest(BaseModel):
     resolve_as: Optional[str] = "Done"
 
 
+class SliceActivationRequest(BaseModel):
+    project_key: str
+    max_issues: int = 1500
+    include_subtasks: bool = False
+    augment_soft_deps: bool = True
+    activate: bool = True
+    use_neo4j: bool = True
+
+
+def _build_active_dataset_label(dataset_id: Optional[str], original_name: str, project_key: Optional[str]) -> str:
+    if project_key:
+        return f"{original_name} [{project_key}]"
+    return original_name
+
+
+def _refresh_pipeline() -> None:
+    global _db, _pipeline, _db_mode
+    if _pipeline:
+        _pipeline.stop_monitoring()
+    if _db:
+        _db.close()
+
+    _db, _db_mode = create_db()
+    from agents import AgentPipeline
+    api_key = os.getenv("GROQ_API_KEY", "")
+    _pipeline = AgentPipeline(
+        db=_db,
+        openai_api_key=api_key,
+        poll_interval=int(os.getenv("MONITOR_INTERVAL", "60")),
+    )
+    _pipeline.start_monitoring()
+
+
+def _activate_slice(issues_csv: str, deps_csv: str, *, use_neo4j: bool, dataset_id: Optional[str], dataset_name: str, project_key: Optional[str]) -> dict:
+    os.environ["ISSUES_CSV"] = issues_csv
+    os.environ["DEPS_CSV"] = deps_csv
+    os.environ["USE_NEO4J"] = "true" if use_neo4j else "false"
+
+    if use_neo4j:
+        from build_graph import GraphDB, rebuild_graph
+        db = GraphDB(
+            uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            user=os.getenv("NEO4J_USER", "neo4j"),
+            password=os.getenv("NEO4J_PASSWORD", "issuegraph123"),
+        )
+        try:
+            rebuild_graph(db, issues_csv=issues_csv, deps_csv=deps_csv)
+        finally:
+            db.close()
+
+    _refresh_pipeline()
+    _active_dataset.update({
+        "dataset_id": dataset_id,
+        "dataset_name": dataset_name,
+        "project": project_key,
+        "issues_path": issues_csv,
+        "deps_path": deps_csv,
+    })
+    return {
+        "status": "ok",
+        "db_mode": _db_mode,
+        "dataset_id": dataset_id,
+        "dataset_name": dataset_name,
+        "project": project_key,
+        "issues_path": issues_csv,
+        "deps_path": deps_csv,
+    }
+
+
 def require_pipeline():
     if _pipeline is None:
         raise HTTPException(
@@ -142,7 +221,87 @@ def health():
         "data_loaded": issues_path.exists() and deps_path.exists(),
         "issues_path": str(issues_path),
         "deps_path": str(deps_path),
+        "active_dataset": dict(_active_dataset),
     }
+
+
+@app.get("/datasets", tags=["datasets"])
+def list_available_datasets():
+    from dataset_manager import list_datasets
+
+    return {
+        "active_dataset": dict(_active_dataset),
+        "datasets": list_datasets(),
+    }
+
+
+@app.get("/datasets/{dataset_id}", tags=["datasets"])
+def get_dataset_details(dataset_id: str):
+    from dataset_manager import get_dataset
+
+    try:
+        dataset = get_dataset(dataset_id)
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    return dataset
+
+
+@app.post("/datasets/upload", tags=["datasets"])
+async def upload_dataset(file: UploadFile = File(...)):
+    from dataset_manager import save_uploaded_dataset
+
+    suffix = Path(file.filename or "upload.bin").suffix or ".bin"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        temp_path = Path(tmp.name)
+    try:
+        dataset = save_uploaded_dataset(temp_path, file.filename or temp_path.name)
+    except Exception as e:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        log.exception("Dataset upload failed")
+        raise HTTPException(500, str(e))
+    return dataset
+
+
+@app.post("/datasets/{dataset_id}/activate", tags=["datasets"])
+def prepare_and_activate_dataset_slice(dataset_id: str, req: SliceActivationRequest):
+    from dataset_manager import get_dataset, prepare_slice
+
+    try:
+        dataset = get_dataset(dataset_id)
+        slice_info = prepare_slice(
+            dataset_id=dataset_id,
+            project_key=req.project_key,
+            max_issues=req.max_issues,
+            include_subtasks=req.include_subtasks,
+            augment_soft_deps=req.augment_soft_deps,
+        )
+        activation = None
+        if req.activate:
+            activation = _activate_slice(
+                slice_info["issues_csv"],
+                slice_info["deps_csv"],
+                use_neo4j=req.use_neo4j,
+                dataset_id=dataset_id,
+                dataset_name=_build_active_dataset_label(dataset_id, dataset["original_name"], req.project_key.upper()),
+                project_key=req.project_key.upper(),
+            )
+        return {
+            "dataset_id": dataset_id,
+            "project": req.project_key.upper(),
+            "slice": slice_info,
+            "activation": activation,
+        }
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        log.exception("Slice preparation failed")
+        raise HTTPException(500, str(e))
 
 
 @app.post("/query", tags=["agents"])
@@ -244,8 +403,9 @@ def get_dashboard(project: Optional[str] = Query(None)):
     """Full dashboard: summary cards + top risks + action plan + LLM analysis."""
     pipeline = require_pipeline()
     try:
-        top_risks = pipeline.reasoning.top_risky_issues(k=10, project=project)
-        nodes     = pipeline.perception.fetch_all_nodes(project)
+        effective_project = project or _active_dataset.get("project")
+        top_risks = pipeline.reasoning.top_risky_issues(k=10, project=effective_project)
+        nodes     = pipeline.perception.fetch_all_nodes(effective_project)
         node_map  = {n.issue_id: n for n in nodes}
         risk_map  = {r.issue_id: r for r in top_risks}
         plan      = pipeline.planning.create_mitigation_plan(risk_map, node_map)
@@ -269,6 +429,7 @@ def get_dashboard(project: Optional[str] = Query(None)):
 
         return {
             "db_mode": _db_mode,
+            "active_dataset": dict(_active_dataset),
             "summary": {
                 "total_open":    len(nodes),
                 "high_risk":     len(high_risk),
@@ -330,7 +491,7 @@ def predictive_analysis(
         payload = run_predictive_experiment(
             issues_path=os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
             deps_path=os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
-            project=project,
+            project=project or _active_dataset.get("project"),
             threshold=threshold,
             positive_target=positive_target,
             total_target=total_target,
@@ -357,7 +518,7 @@ def train_predictive_model(
         payload = train_model(
             issues_path=os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
             deps_path=os.getenv("DEPS_CSV", "data/processed/dependencies.csv"),
-            project=project,
+            project=project or _active_dataset.get("project"),
             model_path="data/models/predictive_model.joblib",
             n_splits=folds,
             text_encoder_model=text_encoder_model,
@@ -381,6 +542,7 @@ def predictive_model_info():
             "text_encoder_model": artifact.get("text_encoder_model", "unknown"),
             "trained_at": artifact.get("trained_at"),
             "project": artifact.get("project"),
+            "active_dataset": dict(_active_dataset),
         }
     except FileNotFoundError:
         return {"available": False}

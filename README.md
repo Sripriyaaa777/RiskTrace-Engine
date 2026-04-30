@@ -6,7 +6,7 @@ RiskTrace Engine ingests Jira-style issue data, builds a dependency graph, propa
 
 The project now supports:
 - real Apache Jira BSON preprocessing
-- synthetic demo data for visualization
+- user-uploaded Jira-like datasets with project-slice selection
 - transformer-based prediction using `distilroberta-base`
 - optional Groq-powered LLM explanations
 - CSV-backed runtime and Neo4j graph loading support
@@ -88,6 +88,7 @@ Optional Groq LLM explanation layer
 RiskTrace-Engine-main/
 ├── main.py                   FastAPI app and all API routes
 ├── preprocess.py             Raw Jira preprocessing and synthetic data generation
+├── dataset_manager.py        Uploaded dataset registry and slice preparation
 ├── predictive_model.py       Transformer-based predictive training pipeline
 ├── predictive_analysis.py    Historical replay and predictive validation
 ├── risk_engine.py            Core dependency risk propagation
@@ -108,11 +109,13 @@ RiskTrace-Engine-main/
 - BSON support for real Apache Jira exports
 - Safe handling of malformed records
 - Explicit + soft dependency extraction
+- User-uploaded dataset ingestion
+- Automatic project-slice discovery (e.g. HADOOP, SPARK, HIVE)
 - Temporal downstream risk propagation
 - Counterfactual graph simulation
 - Transformer-enhanced predictive delay detection
 - Cross-validation and temporal holdout evaluation
-- UI support for both synthetic and real Jira backends
+- Dataset-driven UI workflow for upload → slice selection → activation
 
 ## Installation
 
@@ -128,38 +131,6 @@ source .venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
-
-## Running With Synthetic Data
-
-Synthetic mode is best for demos because it has a denser dependency graph and more visually obvious cascades.
-
-### 1. Generate synthetic processed data
-
-```bash
-.venv/bin/python preprocess.py --synthetic
-```
-
-This creates:
-- `data/processed/issues.csv`
-- `data/processed/dependencies.csv`
-
-### 2. Start the synthetic backend
-
-```bash
-.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8005
-```
-
-### 3. Open the UI
-
-Serve the static UI:
-
-```bash
-python3 -m http.server 9000
-```
-
-Then open:
-
-- UI: [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8005](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8005)
 
 ## Recommended Run: Real Apache Jira + Neo4j + UI
 
@@ -271,6 +242,79 @@ CSV staging imported to graph
 
 That means Neo4j is the active backend. CSV is only the import/staging format produced by preprocessing.
 
+## Product Workflow: Upload Your Own Dataset
+
+The UI now supports user-provided Jira-like datasets, not just a preloaded HADOOP slice.
+
+Supported input formats:
+- BSON
+- JSON
+- CSV
+
+### What the product flow does
+
+```text
+Upload dataset
+    ->
+Discover available project slices
+    ->
+Choose one slice (e.g. HADOOP / SPARK / HIVE)
+    ->
+Prepare issues.csv + dependencies.csv for that slice
+    ->
+Activate the slice in the live backend
+    ->
+Refresh dashboard / what-if / predictive views
+```
+
+### UI flow
+
+1. Open the served dashboard:
+
+- [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004)
+
+2. Open `Settings`
+3. Upload a BSON / JSON / CSV Jira-like dataset
+4. Select an uploaded dataset
+5. Select a discovered project slice like `HADOOP`, `SPARK`, or `HIVE`
+6. Click `Prepare Slice & Activate`
+
+The Settings modal now supports:
+- `Uploading...` and `Preparing slice...` progress states
+- close button
+- click-outside-to-close
+- `Back to Dashboard`
+- automatic return to the dashboard after successful activation
+
+### New dataset endpoints
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/datasets` | List uploaded datasets and current active dataset |
+| GET | `/datasets/{dataset_id}` | Show discovered project slices for one uploaded dataset |
+| POST | `/datasets/upload` | Upload a raw dataset file and discover projects |
+| POST | `/datasets/{dataset_id}/activate` | Prepare and activate a chosen slice |
+
+### What “CSV staging imported to graph” means
+
+When the UI status shows:
+
+```text
+backend: neo4j
+CSV staging imported to graph
+```
+
+it means:
+
+```text
+raw Jira dataset
+-> normalized slice CSV files
+-> graph loaded into Neo4j
+-> backend queries Neo4j
+```
+
+So CSV is not the final database. It is only the normalized staging/import format.
+
 ## Current Real Jira Slice
 
 Current verified HADOOP slice:
@@ -344,6 +388,7 @@ Returns:
 - encoder model
 - trained time
 - project
+- active dataset
 
 ## Main API Endpoints
 
@@ -370,9 +415,8 @@ The dashboard in [issuegraph_ui.html](/Users/sreejith/RiskTrace-Engine-main%202/
 - Alerts
 - What-If analysis
 - Predictive model summary panel
-- Dataset switching between:
-  - real Jira backend
-  - synthetic backend
+- Dataset upload + slice activation
+- Backend settings and connection status
 
 ## Counterfactual What-If Analysis
 
@@ -421,6 +465,20 @@ Example predictive-analysis run:
 - accuracy: `1.000`
 
 These numbers are on a small real-data slice and should be interpreted cautiously.
+
+### Uploaded-slice runtime example
+
+Verified uploaded slices in this workspace include real project slices such as:
+- `HADOOP`
+- `SPARK`
+- `HIVE`
+
+Example activated runtime slice:
+- dataset label: `issues.bson [SPARK]`
+- slice size: `1500` issues
+- dependencies: `4368`
+
+Important note: different project slices can have very different metadata quality. Some slices may have good dependency structure but weak delay/deadline coverage, which affects dashboard ranking quality.
 
 ## Groq / LLM Support
 
@@ -471,6 +529,28 @@ Effects:
 - real graphs look sparser
 - counterfactual improvements are often smaller
 - what-if views can be less visually dramatic
+- some slices may load correctly but still produce weak top-risk ranking if deadline or delay metadata is missing
+
+## Known Limitation: Slice Quality Varies
+
+Not every uploaded project slice is equally informative.
+
+Examples of slice-specific issues:
+- some slices have many dependencies but no usable due dates
+- some slices have zero explicit delay labels
+- some slices rely heavily on inferred soft dependencies
+
+This means a slice can still be:
+- graph-valid
+- loaded successfully
+- useful for what-if analysis
+
+while still being weaker for:
+- top-risk ranking
+- delay-days interpretation
+- predictive validation quality
+
+In these cases, the system should be interpreted as a graph-based decision-support tool rather than an exact delay forecaster.
 
 ## How To Improve The Real Jira Pipeline
 

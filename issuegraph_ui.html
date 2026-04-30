@@ -330,17 +330,48 @@
 <!-- API Config Modal -->
 <div id="api-overlay"></div>
 <div id="api-config">
+  <button
+    type="button"
+    onclick="closeConfig()"
+    aria-label="Close settings"
+    style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;"
+  >&times;</button>
   <h3>⚡ Connect to Backend</h3>
   <p>Enter your IssueGraphAgent++ API base URL to get started.</p>
-  <label class="form-label-mono">Dataset Presets</label>
+  <label class="form-label-mono">Dataset Backend</label>
   <div style="display:flex;gap:8px;margin-bottom:14px;">
-    <button class="btn-primary" style="margin:0;padding:9px 12px;" onclick="selectPreset('real')">Real Jira</button>
-    <button class="btn-primary" style="margin:0;padding:9px 12px;background:#1f2937;" onclick="selectPreset('synthetic')">Synthetic</button>
+    <button class="btn-primary" style="margin:0;padding:9px 12px;" onclick="selectDatasetBackend()">Dataset</button>
   </div>
   <label class="form-label-mono">API Base URL</label>
   <input class="form-input" id="api-url-input" placeholder="http://127.0.0.1:8002" value="http://127.0.0.1:8002"/>
   <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);" id="api-current-hint"></div>
   <button class="btn-primary" onclick="saveConfig()">Connect &amp; Load Dashboard</button>
+  <div style="height:1px;background:var(--border);margin:18px 0;"></div>
+  <h3 style="margin-top:0">📦 Upload Dataset &amp; Choose Slice</h3>
+  <p style="margin-bottom:12px">Upload a Jira-like dataset, detect available project slices, and activate one directly into the live graph.</p>
+  <label class="form-label-mono">Upload Jira BSON / JSON / CSV</label>
+  <input class="form-input" id="dataset-file-input" type="file" />
+  <button class="btn-primary" id="dataset-upload-btn" style="margin-top:10px" onclick="uploadDatasetFromModal()">Upload Dataset</button>
+  <div id="dataset-upload-status" style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5"></div>
+  <label class="form-label-mono" style="margin-top:16px">Uploaded Dataset</label>
+  <select class="form-input" id="dataset-select" onchange="loadProjectsForSelectedDataset()">
+    <option value="">Choose uploaded dataset…</option>
+  </select>
+  <label class="form-label-mono" style="margin-top:12px">Project Slice</label>
+  <select class="form-input" id="dataset-project-select">
+    <option value="">Choose project…</option>
+  </select>
+  <label class="form-label-mono" style="margin-top:12px">Max Issues Per Slice</label>
+  <input class="form-input" id="dataset-max-issues" type="number" min="100" max="10000" value="1500" />
+  <button class="btn-primary" id="dataset-activate-btn" style="margin-top:12px" onclick="activateSelectedSlice()">Prepare Slice &amp; Activate</button>
+  <div id="dataset-activation-status" style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5"></div>
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+    <button
+      type="button"
+      onclick="closeConfig()"
+      style="background:transparent;border:1px solid var(--border);color:var(--sub);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;"
+    >Back to Dashboard</button>
+  </div>
 </div>
 
 <!-- Sidebar -->
@@ -601,9 +632,8 @@
 
 <script>
 // ── State ──
-const REAL_API_BASE = 'http://127.0.0.1:8004';
-const SYNTHETIC_API_BASE = 'http://127.0.0.1:8005';
-const DEFAULT_API_BASE = REAL_API_BASE;
+const DATASET_API_BASE = 'http://127.0.0.1:8004';
+const DEFAULT_API_BASE = DATASET_API_BASE;
 const LEGACY_API_BASES = new Set([
   'http://localhost:8000',
   'http://127.0.0.1:8000',
@@ -634,10 +664,39 @@ let dashData = null;
 let allRisks = [];
 let predictiveInfo = null;
 let predictiveAnalysis = null;
+let activeDatasetInfo = null;
+let uploadedDatasets = [];
+let currentDbMode = 'csv';
+
+function setDatasetStatus(id, text, tone='muted') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const colors = {
+    muted: 'var(--muted)',
+    progress: 'var(--accent)',
+    success: 'var(--success)',
+    error: 'var(--danger)',
+    warning: 'var(--warning)'
+  };
+  el.textContent = text;
+  el.style.color = colors[tone] || colors.muted;
+}
+
+function setBusyButton(id, busyText, busy) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  if (!btn.dataset.defaultLabel) {
+    btn.dataset.defaultLabel = btn.textContent;
+  }
+  btn.disabled = busy;
+  btn.style.opacity = busy ? '0.65' : '1';
+  btn.style.cursor = busy ? 'wait' : 'pointer';
+  btn.textContent = busy ? busyText : btn.dataset.defaultLabel;
+}
 
 function datasetNameFor(url) {
-  if (url === REAL_API_BASE) return 'Real Jira (HADOOP slice)';
-  if (url === SYNTHETIC_API_BASE) return 'Synthetic demo dataset';
+  if (activeDatasetInfo?.dataset_name) return activeDatasetInfo.dataset_name;
+  if (url === DATASET_API_BASE) return 'Dataset';
   return 'Custom backend';
 }
 
@@ -647,12 +706,16 @@ function saveConfig() {
   if (!url) return;
   API_BASE = url;
   localStorage.setItem('igraph_api', url);
-  document.getElementById('api-overlay').style.display = 'none';
-  document.getElementById('api-config').style.display = 'none';
+  closeConfig();
   checkHealth().then(() => refreshDashboard());
 }
-function selectPreset(kind) {
-  const url = kind === 'synthetic' ? SYNTHETIC_API_BASE : REAL_API_BASE;
+function closeConfig() {
+  document.getElementById('api-overlay').style.display = 'none';
+  document.getElementById('api-config').style.display = 'none';
+  showTab('dashboard');
+}
+function selectDatasetBackend() {
+  const url = DATASET_API_BASE;
   document.getElementById('api-url-input').value = url;
   document.getElementById('api-current-hint').textContent = `Selected: ${datasetNameFor(url)}`;
 }
@@ -661,6 +724,107 @@ function openConfig() {
   document.getElementById('api-config').style.display = 'block';
   document.getElementById('api-url-input').value = API_BASE || DEFAULT_API_BASE;
   document.getElementById('api-current-hint').textContent = `Current: ${datasetNameFor(API_BASE || DEFAULT_API_BASE)}`;
+  loadDatasetManager();
+}
+
+async function loadDatasetManager() {
+  if (!API_BASE) return;
+  try {
+    const r = await fetch(`${API_BASE}/datasets`);
+    if (!r.ok) throw new Error(await r.text());
+    const payload = await r.json();
+    uploadedDatasets = payload.datasets || [];
+    if (payload.active_dataset) activeDatasetInfo = payload.active_dataset;
+    const select = document.getElementById('dataset-select');
+    select.innerHTML = '<option value="">Choose uploaded dataset…</option>' + uploadedDatasets.map(ds =>
+      `<option value="${ds.dataset_id}">${ds.original_name} (${(ds.projects || []).length} projects)</option>`
+    ).join('');
+  } catch (e) {
+    setDatasetStatus('dataset-upload-status', `Dataset manager unavailable: ${e.message}`, 'error');
+  }
+}
+
+async function loadProjectsForSelectedDataset() {
+  const datasetId = document.getElementById('dataset-select').value;
+  const projectSelect = document.getElementById('dataset-project-select');
+  projectSelect.innerHTML = '<option value="">Choose project…</option>';
+  if (!datasetId) return;
+  try {
+    const r = await fetch(`${API_BASE}/datasets/${datasetId}`);
+    if (!r.ok) throw new Error(await r.text());
+    const dataset = await r.json();
+    projectSelect.innerHTML = '<option value="">Choose project…</option>' + (dataset.projects || []).map(p =>
+      `<option value="${p.key}">${p.key} (${p.issue_count} issues)</option>`
+    ).join('');
+    setDatasetStatus('dataset-activation-status', `Loaded ${(dataset.projects || []).length} available project slices from ${dataset.original_name}.`, 'muted');
+  } catch (e) {
+    setDatasetStatus('dataset-activation-status', `Project loading failed: ${e.message}`, 'error');
+  }
+}
+
+async function uploadDatasetFromModal() {
+  const input = document.getElementById('dataset-file-input');
+  if (!input.files || !input.files[0]) {
+    setDatasetStatus('dataset-upload-status', 'Choose a BSON, JSON, or CSV file first.', 'warning');
+    return;
+  }
+  setBusyButton('dataset-upload-btn', 'Uploading…', true);
+  setDatasetStatus('dataset-upload-status', 'Uploading dataset and scanning available project slices…', 'progress');
+  const form = new FormData();
+  form.append('file', input.files[0]);
+  try {
+    const r = await fetch(`${API_BASE}/datasets/upload`, { method: 'POST', body: form });
+    if (!r.ok) throw new Error(await r.text());
+    const dataset = await r.json();
+    setDatasetStatus('dataset-upload-status', `Uploaded ${dataset.original_name}. Found ${(dataset.projects || []).length} project slices.`, 'success');
+    await loadDatasetManager();
+    document.getElementById('dataset-select').value = dataset.dataset_id;
+    await loadProjectsForSelectedDataset();
+  } catch (e) {
+    setDatasetStatus('dataset-upload-status', `Upload failed: ${e.message}`, 'error');
+  } finally {
+    setBusyButton('dataset-upload-btn', 'Uploading…', false);
+  }
+}
+
+async function activateSelectedSlice() {
+  const datasetId = document.getElementById('dataset-select').value;
+  const projectKey = document.getElementById('dataset-project-select').value;
+  const maxIssues = Number(document.getElementById('dataset-max-issues').value || 1500);
+  if (!datasetId || !projectKey) {
+    setDatasetStatus('dataset-activation-status', 'Choose both an uploaded dataset and a project slice.', 'warning');
+    return;
+  }
+  setBusyButton('dataset-activate-btn', 'Preparing slice…', true);
+  setDatasetStatus('dataset-activation-status', `Preparing ${projectKey} slice and activating it. This can take a little while for large Jira files…`, 'progress');
+  try {
+    const r = await fetch(`${API_BASE}/datasets/${datasetId}/activate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_key: projectKey,
+        max_issues: maxIssues,
+        include_subtasks: false,
+        augment_soft_deps: true,
+        activate: true,
+        use_neo4j: currentDbMode === 'neo4j'
+      })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const payload = await r.json();
+    setDatasetStatus(
+      'dataset-activation-status',
+      `Active slice: ${payload.project}. ${payload.slice.stats?.total_issues || '—'} issues, ${payload.slice.stats?.total_dependencies || '—'} dependencies. Backend mode: ${payload.activation?.db_mode || currentDbMode}.`,
+      'success'
+    );
+    await checkHealth();
+    await refreshDashboard();
+    setTimeout(() => closeConfig(), 450);
+  } catch (e) {
+    setDatasetStatus('dataset-activation-status', `Activation failed: ${e.message}`, 'error');
+  } finally {
+    setBusyButton('dataset-activate-btn', 'Preparing slice…', false);
+  }
 }
 
 // ── Health ──
@@ -668,6 +832,8 @@ async function checkHealth() {
   try {
     const r = await fetch(`${API_BASE}/health`);
     const d = await r.json();
+    activeDatasetInfo = d.active_dataset || activeDatasetInfo;
+    currentDbMode = d.db_mode || currentDbMode;
     const dot = document.getElementById('status-dot');
     const lbl = document.getElementById('status-label');
     const ml  = document.getElementById('db-mode-label');
@@ -700,11 +866,12 @@ async function refreshDashboard() {
     const [dashboardResp, modelInfoResp, predictiveResp] = await Promise.all([
       fetch(`${API_BASE}/dashboard`),
       fetch(`${API_BASE}/predictive-model-info`).catch(() => null),
-      fetch(`${API_BASE}/predictive-analysis?project=HADOOP&positive_target=5&total_target=8&use_trained_model=true`).catch(() => null)
+      fetch(`${API_BASE}/predictive-analysis?positive_target=5&total_target=8&use_trained_model=true`).catch(() => null)
     ]);
     const r = dashboardResp;
     if (!r.ok) throw new Error(await r.text());
     dashData = await r.json();
+    activeDatasetInfo = dashData.active_dataset || activeDatasetInfo;
     predictiveInfo = modelInfoResp && modelInfoResp.ok ? await modelInfoResp.json() : null;
     predictiveAnalysis = predictiveResp && predictiveResp.ok ? await predictiveResp.json() : null;
     allRisks = dashData.top_risks || [];
@@ -1050,6 +1217,12 @@ function showError(msg) {
 
 // ── Init ──
 window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('api-overlay').addEventListener('click', closeConfig);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.getElementById('api-config').style.display === 'block') {
+      closeConfig();
+    }
+  });
   if (API_BASE) {
     document.getElementById('api-overlay').style.display = 'none';
     document.getElementById('api-config').style.display = 'none';
