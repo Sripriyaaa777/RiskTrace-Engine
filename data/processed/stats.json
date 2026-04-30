@@ -4,14 +4,14 @@
   "status_distribution": {
     "Done": 111,
     "In Progress": 73,
-    "Blocked": 28,
-    "Open": 88
+    "Open": 88,
+    "Blocked": 28
   },
   "delayed_issues": 70,
   "delayed_percentage": 23.3,
   "issues_with_deadline": 184,
-  "avg_delay_days": -1.58,
-  "max_delay_days": 29.13,
+  "avg_delay_days": -1.03,
+  "max_delay_days": 29.68,
   "isolated_nodes": 160,
   "nodes_in_dependency_graph": 140,
   "avg_in_degree": 1.22,
