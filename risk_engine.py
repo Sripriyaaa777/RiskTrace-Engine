@@ -88,11 +88,11 @@ class RiskResult:
 @dataclass
 class PropagationConfig:
     """Tunable parameters for the risk propagation algorithm."""
-    depth_decay:         float = 0.88   # γ — gentler attenuation for demo visibility
-    temporal_half_life:  float = 45.0   # slightly slower decay for long-running work
-    max_depth:           int   = 12     # stop traversal beyond this depth
-    high_threshold:      float = 0.58
-    medium_threshold:    float = 0.22
+    depth_decay:         float = 0.80   # γ — risk attenuation per hop
+    temporal_half_life:  float = 30.0   # days after which temporal weight = 0.75
+    max_depth:           int   = 10     # stop traversal beyond this depth
+    high_threshold:      float = 0.70
+    medium_threshold:    float = 0.35
 
 
 # ─────────────────────────────────────────────
@@ -122,10 +122,10 @@ def delay_severity(node: IssueNode) -> float:
     Blocked nodes are treated as maximum severity (1.0).
     """
     if node.status == "Blocked":
-        return 0.82
+        return 1.0
     if node.delay_days is not None and node.delay_days > 0:
-        # Smoother curve so overdue work does not instantly saturate the graph.
-        return min(0.25 + math.log1p(node.delay_days) / 6.0, 0.92)
+        # Sigmoid-like: saturates around 30 days overdue
+        return min(node.delay_days / 30.0, 1.0)
     return 0.0
 
 
@@ -133,35 +133,9 @@ def delay_severity(node: IssueNode) -> float:
 # Graph traversal helpers
 # ─────────────────────────────────────────────
 
-def _normalise_dependencies(
-    dependencies,
-) -> list[tuple[str, str, float, str]]:
-    normalised: list[tuple[str, str, float, str]] = []
-    for dep in dependencies:
-        if isinstance(dep, dict):
-            src = dep.get("source")
-            tgt = dep.get("target")
-            confidence = float(dep.get("confidence", 1.0) or 1.0)
-            edge_source = dep.get("edge_source", "explicit_link")
-        else:
-            if len(dep) >= 4:
-                src, tgt, confidence, edge_source = dep[:4]
-            elif len(dep) >= 3:
-                src, tgt, confidence = dep[:3]
-                edge_source = "explicit_link"
-            else:
-                src, tgt = dep[:2]
-                confidence = 1.0
-                edge_source = "explicit_link"
-            confidence = float(confidence or 1.0)
-        if src and tgt and src != tgt:
-            normalised.append((str(src), str(tgt), max(0.15, min(confidence, 1.0)), str(edge_source)))
-    return normalised
-
-
 def build_reverse_adjacency(
-    dependencies: list[tuple[str, str, float, str]]
-) -> dict[str, list[tuple[str, float]]]:
+    dependencies: list[tuple[str, str]]
+) -> dict[str, list[str]]:
     """
     Given a list of (source, target) pairs where source DEPENDS_ON target,
     build a reverse adjacency: for each node, who depends on it?
@@ -171,41 +145,38 @@ def build_reverse_adjacency(
 
     reverse_adj[X] = [A, B, C]  means A, B, C all depend on X.
     """
-    rev: dict[str, list[tuple[str, float]]] = {}
-    for src, tgt, confidence, _ in dependencies:
-        rev.setdefault(tgt, []).append((src, confidence))
+    rev: dict[str, list[str]] = {}
+    for src, tgt in dependencies:
+        rev.setdefault(tgt, []).append(src)
     return rev
 
 
 def find_downstream_nodes(
     origin_id: str,
-    reverse_adj: dict[str, list[tuple[str, float]]],
+    reverse_adj: dict[str, list[str]],
     max_depth: int,
-) -> dict[str, tuple[int, float]]:
+) -> dict[str, int]:
     """
     BFS from origin_id following reverse edges.
     Returns {issue_id: depth_from_origin} for all reachable dependents.
     """
-    visited: dict[str, tuple[int, float]] = {}
-    queue = [(origin_id, 0, 1.0)]
+    visited: dict[str, int] = {}
+    queue = [(origin_id, 0)]
     while queue:
-        node_id, depth, confidence = queue.pop(0)
-        best = visited.get(node_id)
-        if depth > max_depth:
+        node_id, depth = queue.pop(0)
+        if node_id in visited or depth > max_depth:
             continue
-        if best is not None and best[0] <= depth and best[1] >= confidence:
-            continue
-        visited[node_id] = (depth, confidence)
-        for dependent, edge_confidence in reverse_adj.get(node_id, []):
-            next_confidence = confidence * edge_confidence
-            queue.append((dependent, depth + 1, next_confidence))
+        visited[node_id] = depth
+        for dependent in reverse_adj.get(node_id, []):
+            if dependent not in visited:
+                queue.append((dependent, depth + 1))
     return visited
 
 
 def find_dependency_chain(
     start_id: str,
     end_id: str,
-    forward_adj: dict[str, list[tuple[str, float]]],
+    forward_adj: dict[str, list[str]],
     max_depth: int = 10,
 ) -> list[str]:
     """
@@ -215,23 +186,21 @@ def find_dependency_chain(
     """
     if start_id == end_id:
         return [start_id]
-    queue: list[tuple[list[str], float]] = [([start_id], 1.0)]
-    best_score = {start_id: 1.0}
+    queue = [[start_id]]
+    visited = {start_id}
     while queue:
-        queue.sort(key=lambda item: (len(item[0]), -item[1]))
-        path, score = queue.pop(0)
+        path = queue.pop(0)
         if len(path) > max_depth:
             continue
         current = path[-1]
-        for neighbor, edge_confidence in forward_adj.get(current, []):
-            new_score = score * edge_confidence
-            if best_score.get(neighbor, -1.0) >= new_score:
+        for neighbor in forward_adj.get(current, []):
+            if neighbor in visited:
                 continue
             new_path = path + [neighbor]
             if neighbor == end_id:
                 return new_path
-            best_score[neighbor] = new_score
-            queue.append((new_path, new_score))
+            visited.add(neighbor)
+            queue.append(new_path)
     return []
 
 
@@ -257,7 +226,7 @@ class RiskPropagationEngine:
     def propagate(
         self,
         nodes: list[IssueNode],
-        dependencies,
+        dependencies: list[tuple[str, str]],  # (source_id, target_id)
     ) -> dict[str, RiskResult]:
         """
         Run the full propagation algorithm.
@@ -272,13 +241,12 @@ class RiskPropagationEngine:
 
         # Build adjacency structures
         # forward_adj[A] = [B, C]  means A depends on B and C
-        normalised_deps = _normalise_dependencies(dependencies)
-        forward_adj: dict[str, list[tuple[str, float]]] = {}
-        for src, tgt, confidence, _ in normalised_deps:
-            forward_adj.setdefault(src, []).append((tgt, confidence))
+        forward_adj: dict[str, list[str]] = {}
+        for src, tgt in dependencies:
+            forward_adj.setdefault(src, []).append(tgt)
 
         # reverse_adj[X] = [A, B]  means A and B depend on X
-        reverse_adj = build_reverse_adjacency(normalised_deps)
+        reverse_adj = build_reverse_adjacency(dependencies)
 
         # Identify risk origins (delayed / blocked nodes)
         origins = [n for n in nodes if n.is_at_risk() and n.status != "Done"]
@@ -304,7 +272,7 @@ class RiskPropagationEngine:
                 origin.issue_id, reverse_adj, cfg.max_depth
             )
 
-            for dep_id, (depth, path_confidence) in downstream.items():
+            for dep_id, depth in downstream.items():
                 if dep_id == origin.issue_id:
                     continue  # don't score the origin against itself here
                 dep_node = node_map.get(dep_id)
@@ -312,7 +280,7 @@ class RiskPropagationEngine:
                     continue
 
                 # Contribution from this origin to dep_id at given depth
-                contribution = base * (cfg.depth_decay ** max(depth - 1, 0)) * max(path_confidence, 0.45)
+                contribution = base * (cfg.depth_decay ** depth)
 
                 # Find the explanatory chain
                 chain = find_dependency_chain(
@@ -329,8 +297,7 @@ class RiskPropagationEngine:
         # First, record all origin nodes
         for origin in origins:
             sev = delay_severity(origin)
-            tw = temporal_weight(origin.updated, cfg.temporal_half_life)
-            score = min(0.18 + sev * tw * origin.priority_multiplier() * 0.72, 0.96)
+            score = min(sev * origin.priority_multiplier(), 1.0)
             level = self._score_to_level(score)
             summary = self._origin_explanation(origin)
             results[origin.issue_id] = RiskResult(
@@ -349,20 +316,8 @@ class RiskPropagationEngine:
 
         # Then, record all downstream nodes that accumulated risk
         for dep_id, contributions in risk_accum.items():
-            raw_total = sum(c[0] for c in contributions)
-            strongest = max(c[0] for c in contributions)
-            avg_depth = sum(c[2] for c in contributions) / max(len(contributions), 1)
-            fanin = len(contributions)
-            normalised_total = raw_total / (1 + 0.55 * max(fanin - 1, 0))
-            breadth_bonus = min(0.10, 0.02 * max(fanin - 1, 0))
-            depth_penalty = min(0.18, 0.025 * max(avg_depth - 1, 0))
-            total_score = min(
-                0.42 * strongest
-                + 0.36 * (1 - math.exp(-0.95 * normalised_total))
-                + breadth_bonus
-                - depth_penalty,
-                0.98,
-            )
+            # Aggregate: sum contributions, cap at 1.0
+            total_score = min(sum(c[0] for c in contributions), 1.0)
             level = self._score_to_level(total_score)
 
             # Find the strongest contributing origin

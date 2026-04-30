@@ -37,7 +37,7 @@ class CsvGraphDB:
         deps_path: str   = "data/processed/dependencies.csv",
     ):
         self._issues: "dict" = {}   # issue_id → row dict
-        self._deps: "list" = []
+        self._deps: "list" = []  # (src, tgt, link_type)
 
         self._load_issues(Path(issues_path))
         self._load_deps(Path(deps_path))
@@ -67,13 +67,7 @@ class CsvGraphDB:
             return
         with open(path, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                self._deps.append({
-                    "source": row["source"],
-                    "target": row["target"],
-                    "link_type": row.get("link_type", "depends on"),
-                    "edge_source": row.get("edge_source", "explicit_link"),
-                    "confidence": float(row.get("confidence") or 1.0),
-                })
+                self._deps.append((row["source"], row["target"], row.get("link_type", "depends on")))
 
     # ── Query interface (mimics neo4j driver .run()) ──────────────────
 
@@ -85,8 +79,13 @@ class CsvGraphDB:
         params = parameters or {}
         q = query.strip().lower()
 
+        # Pattern: count delayed issues
+        if "is_delayed = true" in q and "count(n)" in q:
+            n = sum(1 for v in self._issues.values() if v["is_delayed"])
+            return _ResultSet([{"c": n}])
+
         # Pattern: fetch ALL issue nodes including Done (for counterfactual)
-        if "match (n:issue)" in q and "n.status <> 'done'" not in q and "return n {.*}" in q:
+        if "match (n:issue" in q and "n.status <> 'done'" not in q and "return n {.*}" in q:
             project = params.get("project")
             rows = [
                 {"props": dict(v)}
@@ -96,7 +95,7 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: fetch all issue nodes (not Done)
-        if "match (n:issue)" in q and "n.status <> 'done'" in q and "return n {.*}" in q:
+        if "match (n:issue" in q and "n.status <> 'done'" in q and "return n {.*}" in q:
             project = params.get("project")
             rows = [
                 {"props": dict(v)}
@@ -107,7 +106,7 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: fetch all issue nodes including Done (for snapshot)
-        if "match (n:issue)" in q and "return n {.*}" not in q and "return n.issue_id" in q:
+        if "match (n:issue" in q and "return n {.*}" not in q and "return n.issue_id" in q:
             rows = [
                 {"id": v["issue_id"], "status": v["status"], "delay_days": v["delay_days"]}
                 for v in self._issues.values()
@@ -116,7 +115,7 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: snapshot (status + delay per open issue)
-        if "match (n:issue)" in q and "n.status <> 'done'" in q and "return n.issue_id" in q:
+        if "match (n:issue" in q and "n.status <> 'done'" in q and "return n.issue_id" in q:
             rows = [
                 {"id": v["issue_id"], "status": v["status"], "delay_days": v["delay_days"]}
                 for v in self._issues.values()
@@ -133,16 +132,11 @@ class CsvGraphDB:
             return _ResultSet([])
 
         # Pattern: fetch all DEPENDS_ON edges
-        if "match (src:issue)-[" in q and "depends_on]->(tgt:issue)" in q and "return src.issue_id" in q:
+        if "match (src:issue)-[:depends_on]->(tgt:issue)" in q and "return src.issue_id" in q:
             rows = [
-                {
-                    "source": dep["source"],
-                    "target": dep["target"],
-                    "confidence": dep.get("confidence", 1.0),
-                    "edge_source": dep.get("edge_source", "explicit_link"),
-                }
-                for dep in self._deps
-                if dep["source"] in self._issues and dep["target"] in self._issues
+                {"source": src, "target": tgt}
+                for src, tgt, _ in self._deps
+                if src in self._issues and tgt in self._issues
             ]
             return _ResultSet(rows)
 
@@ -162,30 +156,19 @@ class CsvGraphDB:
         if "src.issue_id in $ids" in q:
             ids = set(params.get("ids", []))
             rows = [
-                {
-                    "source": dep["source"],
-                    "target": dep["target"],
-                    "link_type": dep.get("link_type", "depends on"),
-                    "edge_source": dep.get("edge_source", "explicit_link"),
-                    "confidence": dep.get("confidence", 1.0),
-                }
-                for dep in self._deps
-                if dep["source"] in ids and dep["target"] in ids
+                {"source": src, "target": tgt, "link_type": lt}
+                for src, tgt, lt in self._deps
+                if src in ids and tgt in ids
             ]
             return _ResultSet(rows)
 
-        # Pattern: return all edges with metadata
-        if "match (src:issue)-[r:depends_on]->(tgt:issue)" in q and "coalesce(r.link_type" in q:
-            rows = [
-                {
-                    "source": dep["source"],
-                    "target": dep["target"],
-                    "link_type": dep.get("link_type", "depends on"),
-                    "edge_source": dep.get("edge_source", "explicit_link"),
-                    "confidence": dep.get("confidence", 1.0),
-                }
-                for dep in self._deps
-            ]
+        # Pattern: blockers of delayed issues
+        if "match (blocker:issue)-[:depends_on]->(blocked:issue)" in q and "blocked.is_delayed = true" in q:
+            blocker_ids = {
+                src for src, tgt, _ in self._deps
+                if tgt in self._issues and self._issues[tgt]["is_delayed"] and src in self._issues
+            }
+            rows = [{"props": dict(self._issues[iid])} for iid in blocker_ids]
             return _ResultSet(rows)
 
         # Pattern: blocked/delayed issues with dependents (for CypherBaseline)
@@ -193,7 +176,7 @@ class CsvGraphDB:
             delayed_ids = {iid for iid, v in self._issues.items() if v["is_delayed"]}
             # find immediate dependents
             dependent_ids = {
-                dep["source"] for dep in self._deps if dep["target"] in delayed_ids
+                src for src, tgt, _ in self._deps if tgt in delayed_ids
             }
             all_ids = list(delayed_ids | dependent_ids)[:params.get("k", 10)]
             return _ResultSet([{"id": iid} for iid in all_ids])
@@ -210,9 +193,6 @@ class CsvGraphDB:
             return _ResultSet([{"c": len(self._issues)}])
         if "return count(r)" in q:
             return _ResultSet([{"c": len(self._deps)}])
-        if "is_delayed = true" in q and "count(n)" in q:
-            n = sum(1 for v in self._issues.values() if v["is_delayed"])
-            return _ResultSet([{"c": n}])
 
         # Pattern: max chain depth (simplified)
         if "length(path)" in q:
@@ -236,8 +216,8 @@ class CsvGraphDB:
         """BFS upstream: find all nodes that start_id depends on."""
         # forward adjacency: src depends on tgt  → tgt is upstream of src
         forward: "dict" = {}
-        for dep in self._deps:
-            forward.setdefault(dep["source"], []).append(dep["target"])
+        for src, tgt, _ in self._deps:
+            forward.setdefault(src, []).append(tgt)
 
         visited = set()
         queue = [(start_id, 0)]
@@ -256,8 +236,8 @@ class CsvGraphDB:
     def _estimate_max_depth(self) -> int:
         """Estimate the longest chain length via BFS from all sources."""
         forward: "dict" = {}
-        for dep in self._deps:
-            forward.setdefault(dep["source"], []).append(dep["target"])
+        for src, tgt, _ in self._deps:
+            forward.setdefault(src, []).append(tgt)
 
         max_d = 0
         for start in list(forward.keys())[:20]:   # sample to keep it fast

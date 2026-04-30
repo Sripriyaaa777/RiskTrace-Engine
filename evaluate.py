@@ -21,9 +21,9 @@ Metrics:
   - Time-to-detection (seconds) (latency)
 
 Usage:
-    python evaluate.py \
-        --benchmark benchmark_queries.json \
-        --output    results.json
+    python evaluation/evaluate.py \
+        --benchmark evaluation/benchmark_queries.json \
+        --output    evaluation/results.json
 """
 
 import json

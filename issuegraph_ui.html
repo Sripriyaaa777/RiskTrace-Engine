@@ -332,8 +332,14 @@
 <div id="api-config">
   <h3>⚡ Connect to Backend</h3>
   <p>Enter your IssueGraphAgent++ API base URL to get started.</p>
+  <label class="form-label-mono">Dataset Presets</label>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="btn-primary" style="margin:0;padding:9px 12px;" onclick="selectPreset('real')">Real Jira</button>
+    <button class="btn-primary" style="margin:0;padding:9px 12px;background:#1f2937;" onclick="selectPreset('synthetic')">Synthetic</button>
+  </div>
   <label class="form-label-mono">API Base URL</label>
-  <input class="form-input" id="api-url-input" placeholder="http://localhost:8000" value="http://localhost:8000"/>
+  <input class="form-input" id="api-url-input" placeholder="http://127.0.0.1:8002" value="http://127.0.0.1:8002"/>
+  <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);" id="api-current-hint"></div>
   <button class="btn-primary" onclick="saveConfig()">Connect &amp; Load Dashboard</button>
 </div>
 
@@ -370,10 +376,6 @@
     <div class="nav-item" onclick="refreshDashboard()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
       Refresh Data
-    </div>
-    <div class="nav-item" onclick="loadSyntheticDemo()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6"/><path d="M12 16v6"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 14.83l4.24 4.24"/><path d="M2 12h6"/><path d="M16 12h6"/><path d="M4.93 19.07l4.24-4.24"/><path d="M14.83 9.17l4.24-4.24"/><circle cx="12" cy="12" r="3"/></svg>
-      Load Synthetic Demo
     </div>
     <div class="nav-item" onclick="openConfig()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
@@ -433,6 +435,12 @@
           </div>
         </div>
         <div class="col-12 col-xl-4">
+          <div class="card-base mb-3">
+            <div class="card-header-bar"><span class="title">GenAI Predictive Model</span></div>
+            <div style="padding:16px" id="predictive-summary">
+              <div class="empty-state">Loading predictive model…</div>
+            </div>
+          </div>
           <div class="card-base mb-3">
             <div class="card-header-bar"><span class="title">LLM Analysis</span></div>
             <div style="padding:16px" id="llm-summary">
@@ -513,10 +521,6 @@
             </button>
           </div>
           <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted)">Tip: type any issue ID from the Risk Board and hit Enter to simulate its resolution.</div>
-          <div style="margin-top:14px">
-            <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.08em">BEST WHAT-IF CANDIDATES</div>
-            <div id="cf-candidates" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-          </div>
         </div>
 
         <div id="cf-spinner" style="display:none;text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted)">&#9203; Running propagation simulation&#8230;</div>
@@ -597,9 +601,45 @@
 
 <script>
 // ── State ──
-let API_BASE = localStorage.getItem('igraph_api') || '';
+const REAL_API_BASE = 'http://127.0.0.1:8004';
+const SYNTHETIC_API_BASE = 'http://127.0.0.1:8005';
+const DEFAULT_API_BASE = REAL_API_BASE;
+const LEGACY_API_BASES = new Set([
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+  'http://localhost:8001',
+  'http://127.0.0.1:8001',
+  'http://localhost:8002',
+  'http://127.0.0.1:8002'
+]);
+
+function getInitialApiBase() {
+  const queryApi = new URLSearchParams(window.location.search).get('api');
+  if (queryApi) {
+    const cleaned = queryApi.replace(/\/$/, '');
+    localStorage.setItem('igraph_api', cleaned);
+    return cleaned;
+  }
+  const saved = (localStorage.getItem('igraph_api') || '').replace(/\/$/, '');
+  if (!saved) return DEFAULT_API_BASE;
+  if (LEGACY_API_BASES.has(saved)) {
+    localStorage.setItem('igraph_api', DEFAULT_API_BASE);
+    return DEFAULT_API_BASE;
+  }
+  return saved;
+}
+
+let API_BASE = getInitialApiBase();
 let dashData = null;
 let allRisks = [];
+let predictiveInfo = null;
+let predictiveAnalysis = null;
+
+function datasetNameFor(url) {
+  if (url === REAL_API_BASE) return 'Real Jira (HADOOP slice)';
+  if (url === SYNTHETIC_API_BASE) return 'Synthetic demo dataset';
+  return 'Custom backend';
+}
 
 // ── Config ──
 function saveConfig() {
@@ -611,10 +651,16 @@ function saveConfig() {
   document.getElementById('api-config').style.display = 'none';
   checkHealth().then(() => refreshDashboard());
 }
+function selectPreset(kind) {
+  const url = kind === 'synthetic' ? SYNTHETIC_API_BASE : REAL_API_BASE;
+  document.getElementById('api-url-input').value = url;
+  document.getElementById('api-current-hint').textContent = `Selected: ${datasetNameFor(url)}`;
+}
 function openConfig() {
   document.getElementById('api-overlay').style.display = 'block';
   document.getElementById('api-config').style.display = 'block';
-  document.getElementById('api-url-input').value = API_BASE;
+  document.getElementById('api-url-input').value = API_BASE || DEFAULT_API_BASE;
+  document.getElementById('api-current-hint').textContent = `Current: ${datasetNameFor(API_BASE || DEFAULT_API_BASE)}`;
 }
 
 // ── Health ──
@@ -634,9 +680,11 @@ async function checkHealth() {
       lbl.textContent = 'Degraded';
       lbl.style.color = 'var(--warning)';
     }
-    ml.textContent = `mode: ${d.db_mode} · ${d.edge_profile || 'full'}`;
-    document.getElementById('mode-badge').textContent = `${d.db_mode.toUpperCase()} MODE`;
-    document.getElementById('m-mode').textContent = `${d.db_mode.toUpperCase()} · ${(d.edge_profile || 'full').toUpperCase()}`;
+    const backendMode = (d.db_mode || 'unknown').toUpperCase();
+    const importSource = d.issues_path ? 'CSV staging imported to graph' : 'live graph';
+    ml.innerHTML = `backend: ${d.db_mode}<br><span style="font-size:10px;color:var(--muted)">${importSource}</span>`;
+    document.getElementById('mode-badge').textContent = `${backendMode} BACKEND`;
+    document.getElementById('m-mode').textContent = d.db_mode.toUpperCase();
   } catch {
     document.getElementById('status-dot').className = 'status-dot offline';
     document.getElementById('status-label').textContent = 'Offline';
@@ -649,9 +697,16 @@ async function refreshDashboard() {
   if (!API_BASE) { openConfig(); return; }
   setLoading(true);
   try {
-    const r = await fetch(`${API_BASE}/dashboard`);
+    const [dashboardResp, modelInfoResp, predictiveResp] = await Promise.all([
+      fetch(`${API_BASE}/dashboard`),
+      fetch(`${API_BASE}/predictive-model-info`).catch(() => null),
+      fetch(`${API_BASE}/predictive-analysis?project=HADOOP&positive_target=5&total_target=8&use_trained_model=true`).catch(() => null)
+    ]);
+    const r = dashboardResp;
     if (!r.ok) throw new Error(await r.text());
     dashData = await r.json();
+    predictiveInfo = modelInfoResp && modelInfoResp.ok ? await modelInfoResp.json() : null;
+    predictiveAnalysis = predictiveResp && predictiveResp.ok ? await predictiveResp.json() : null;
     allRisks = dashData.top_risks || [];
     renderDashboard(dashData);
     renderRiskBoardFull(allRisks);
@@ -663,33 +718,11 @@ async function refreshDashboard() {
   }
 }
 
-async function loadSyntheticDemo() {
-  if (!API_BASE) { openConfig(); return; }
-  try {
-    addMessage('assistant', 'Loading a synthetic demo dataset and preserving the current database mode where possible…');
-    const r = await fetch(`${API_BASE}/demo/load-synthetic`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ max_issues: 250 }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || 'Request failed');
-    await checkHealth();
-    await refreshDashboard();
-    addMessage('assistant', d.message || 'Synthetic demo dataset loaded.');
-    showTab('dashboard');
-  } catch (e) {
-    showError('Synthetic demo load failed: ' + e.message);
-  }
-}
-
-
 function renderDashboard(d) {
   const s = d.summary || {};
   document.getElementById('m-total').textContent  = s.total_open   ?? '—';
   document.getElementById('m-high').textContent   = s.high_risk    ?? '—';
   document.getElementById('m-medium').textContent = s.medium_risk  ?? '—';
-  renderWhatIfCandidates(d.whatif_candidates || []);
 
   // Risk table
   const tbody = document.getElementById('risk-tbody');
@@ -713,10 +746,12 @@ function renderDashboard(d) {
   });
   if (!(d.top_risks||[]).length) tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">No risk data available</div></td></tr>';
 
+  renderPredictiveSummary();
+
   // LLM Summary
   const llm = d.llm_analysis || {};
   const llmEl = document.getElementById('llm-summary');
-  if (llm.summary && llm.summary !== 'LLM unavailable. See structured data.' && llm.error !== 'rate_limited' && !llm.error) {
+  if (llm.summary && llm.summary !== 'LLM unavailable. See structured data.' && !llm.error) {
     llmEl.innerHTML = `
       <p style="color:var(--sub);font-size:12px;line-height:1.6;margin-bottom:12px">${llm.summary}</p>
       ${(llm.root_causes||[]).length ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Root Causes</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">${llm.root_causes.map(id=>`<span style="background:rgba(247,94,94,.12);color:var(--danger);border:1px solid rgba(247,94,94,.25);border-radius:4px;font-family:var(--mono);font-size:10px;padding:2px 7px">${id}</span>`).join('')}</div>` : ''}
@@ -742,6 +777,73 @@ function renderDashboard(d) {
       </div>
     </div>
   `).join('') || '<div class="empty-state">No status data</div>';
+}
+
+function renderPredictiveSummary() {
+  const el = document.getElementById('predictive-summary');
+  const datasetLabel = datasetNameFor(API_BASE);
+  const model = predictiveInfo || {};
+  const metrics = predictiveAnalysis?.metrics || null;
+  const topIssues = (predictiveAnalysis?.evaluated_issues || [])
+    .filter(r => r.predicted)
+    .sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0))
+    .slice(0, 3);
+
+  const fmtMetric = (value) => value == null ? '—' : Number(value).toFixed(3);
+  const trainedAt = model.trained_at ? new Date(model.trained_at).toLocaleString() : 'unknown';
+
+  if (!model.available && !metrics) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);line-height:1.6">No predictive model metadata available for this backend yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Dataset</div>
+          <div style="margin-top:5px;font-size:12px;color:var(--text)">${datasetLabel}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Classifier</div>
+          <div style="margin-top:5px;font-size:12px;color:var(--text)">${model.model_kind || 'active model'}</div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">GenAI text encoder</div>
+        <div style="margin-top:5px;font-size:12px;color:var(--accent);font-family:var(--mono)">${model.text_encoder_model || 'unknown'}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--sub);line-height:1.5">Issue summaries/descriptions are converted into transformer embeddings, then combined with graph/time features for delay-risk prediction.</div>
+        <div style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--muted)">trained: ${trainedAt}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">precision</div>
+          <div style="margin-top:5px;font-family:var(--display);font-size:18px;color:var(--text)">${fmtMetric(metrics?.precision)}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">recall</div>
+          <div style="margin-top:5px;font-family:var(--display);font-size:18px;color:var(--text)">${fmtMetric(metrics?.recall)}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">accuracy</div>
+          <div style="margin-top:5px;font-family:var(--display);font-size:18px;color:var(--text)">${fmtMetric(metrics?.accuracy)}</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Live flagged issues</div>
+        ${topIssues.length ? `
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${topIssues.map(r => `
+              <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+                <span class="issue-id" onclick="lookupIssue('${r.issue_id}')">${r.issue_id}</span>
+                <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:${scoreColor(r.risk_score)}">${(r.risk_score || 0).toFixed(3)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<div style="font-size:12px;color:var(--muted)">No predictive results loaded.</div>`}
+      </div>
+    </div>
+  `;
 }
 
 function renderRiskBoardFull(risks) {
@@ -821,20 +923,6 @@ async function fetchAlerts() {
   } catch(e) {
     showError('Failed to fetch alerts: ' + e.message);
   }
-}
-
-function renderWhatIfCandidates(candidates) {
-  const el = document.getElementById('cf-candidates');
-  if (!el) return;
-  if (!candidates.length) {
-    el.innerHTML = '<span style="font-size:12px;color:var(--muted)">No strong simulation candidates found right now.</span>';
-    return;
-  }
-  el.innerHTML = candidates.map(c => `
-    <button onclick="prefillWhatIf('${c.issue_id}')" style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 10px;color:var(--text);font-family:var(--mono);font-size:11px;cursor:pointer">
-      ${c.issue_id} · ${(c.suitability||0).toFixed(2)}
-    </button>
-  `).join('');
 }
 
 // ── Issue Lookup ──
@@ -1022,9 +1110,9 @@ function renderCounterfactual(data) {
       <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;letter-spacing:.05em">${c.label}</div>
     </div>`).join('');
 
-  // Graph diff
-  renderCFGraph('cf-canvas-before', data.graph_nodes, data.graph_edges, 'before', data.issue_id);
-  renderCFGraph('cf-canvas-after',  data.graph_nodes, data.graph_edges, 'after',  data.issue_id);
+  // Graph diff: prioritize the same changed nodes shown in the delta table.
+  renderCFGraph('cf-canvas-before', data.graph_nodes, data.graph_edges, data.diff || [], 'before', data.issue_id);
+  renderCFGraph('cf-canvas-after',  data.graph_nodes, data.graph_edges, data.diff || [], 'after',  data.issue_id);
 
   // Diff table
   const tbody = document.getElementById('cf-diff-body');
@@ -1059,72 +1147,126 @@ function renderCounterfactual(data) {
   document.getElementById('cf-result').style.display = '';
 }
 
-function renderCFGraph(canvasId, graphNodes, graphEdges, mode, resolvedId) {
+function renderCFGraph(canvasId, graphNodes, graphEdges, diffRows, mode, resolvedId) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  const changedIds = new Set((diffRows || []).map(d => d.issue_id));
+  const diffById = new Map((diffRows || []).map(d => [d.issue_id, d]));
+  const sortedDiffRows = [...(diffRows || [])]
+    .sort((a, b) => Math.abs(b.delta || 0) - Math.abs(a.delta || 0));
+  const largeImpactView = changedIds.size >= 24;
+  const visibleLimit = largeImpactView ? 30 : changedIds.size;
+  const visibleChangedIds = new Set(sortedDiffRows.slice(0, visibleLimit).map(d => d.issue_id));
+  const hiddenChangedCount = Math.max(0, changedIds.size - visibleChangedIds.size);
+
+  // Show the highest-impact changed nodes plus the resolved node. The full
+  // changed-node list remains in the table, which is better for dense cases.
+  let nodes = graphNodes.filter(n => n.id === resolvedId || visibleChangedIds.has(n.id));
+  if (!nodes.length) {
+    nodes = graphNodes.filter(n => n.id === resolvedId);
+  }
+  if (nodes.length < 2) {
+    const context = graphNodes.filter(n => n.id !== resolvedId).slice(0, 34);
+    nodes = nodes.concat(context);
+  }
+
+  const displayWidth = Math.max(420, Math.floor(canvas.clientWidth || canvas.getBoundingClientRect().width || 420));
+  canvas.width = displayWidth;
+  const dynamicHeight = Math.max(390, Math.min(760, 300 + Math.ceil(nodes.length / 8) * 62));
+  canvas.height = dynamicHeight;
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-
-  // Cap nodes for perf; always include the resolved node first
-  const MAX = 24;
-  let nodes = graphNodes.filter(n => n.id === resolvedId);
-  const rest = graphNodes.filter(n => n.id !== resolvedId).slice(0, MAX - 1);
-  nodes = nodes.concat(rest);
 
   // Build id set for edge filtering
   const idSet = new Set(nodes.map(n => n.id));
   const edges = graphEdges.filter(e => idSet.has(e.source) && idSet.has(e.target));
 
-  // Initial positions — circle layout
   const pos = {};
-  nodes.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-    pos[n.id] = {
-      x: W / 2 + (W * 0.38) * Math.cos(angle),
-      y: H / 2 + (H * 0.38) * Math.sin(angle),
-      vx: 0, vy: 0
-    };
-  });
 
-  // Force-directed relaxation (80 iterations)
-  for (let iter = 0; iter < 80; iter++) {
+  if (largeImpactView) {
+    const resolved = nodes.find(n => n.id === resolvedId);
+    const changed = nodes
+      .filter(n => n.id !== resolvedId)
+      .sort((a, b) => Math.abs(diffById.get(b.id)?.delta || 0) - Math.abs(diffById.get(a.id)?.delta || 0));
+
+    if (resolved) {
+      pos[resolved.id] = { x: W / 2, y: H / 2, fixed: true };
+    }
+
+    // Start from concentric impact rings instead of a rigid grid. Highest
+    // deltas sit closer to the resolved node, then force relaxation cleans it up.
+    const ringGap = Math.max(76, Math.min(116, W / 6));
+    const centerX = W / 2;
+    const centerY = H / 2;
+    changed.forEach((n, i) => {
+      const ring = Math.floor(Math.sqrt(i / 5));
+      const firstInRing = ring === 0 ? 0 : 5 * ring * ring;
+      const indexInRing = i - firstInRing;
+      const countInRing = Math.max(6, 8 + ring * 7);
+      const angle = (2 * Math.PI * indexInRing / countInRing) - Math.PI / 2 + ring * 0.38;
+      const radius = Math.min(Math.min(W, H) * 0.44, 58 + ring * ringGap);
+      pos[n.id] = {
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle)
+      };
+    });
+  } else {
+    nodes.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+      pos[n.id] = {
+        x: W / 2 + (W * 0.38) * Math.cos(angle),
+        y: H / 2 + (H * 0.38) * Math.sin(angle)
+      };
+    });
+  }
+
+  const iterations = largeImpactView ? 120 : 80;
+  const repulsion = largeImpactView ? 2600 : 1200;
+  const spring = largeImpactView ? 0.012 : 0.018;
+  for (let iter = 0; iter < iterations; iter++) {
     const f = {};
     nodes.forEach(n => { f[n.id] = { x: 0, y: 0 }; });
 
-    // Repulsion
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i].id, b = nodes[j].id;
         let dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y;
         const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
-        const ff = 1200 / (d * d);
+        const ff = repulsion / (d * d);
         f[a].x += dx / d * ff; f[a].y += dy / d * ff;
         f[b].x -= dx / d * ff; f[b].y -= dy / d * ff;
       }
     }
 
-    // Attraction
     edges.forEach(e => {
       if (!pos[e.source] || !pos[e.target]) return;
       const dx = pos[e.target].x - pos[e.source].x;
       const dy = pos[e.target].y - pos[e.source].y;
       const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
-      const ff = d * 0.018;
+      const ff = d * spring;
       f[e.source].x += dx / d * ff; f[e.source].y += dy / d * ff;
       f[e.target].x -= dx / d * ff; f[e.target].y -= dy / d * ff;
     });
 
-    // Gravity to centre
     nodes.forEach(n => {
-      f[n.id].x += (W / 2 - pos[n.id].x) * 0.012;
-      f[n.id].y += (H / 2 - pos[n.id].y) * 0.012;
+      f[n.id].x += (W / 2 - pos[n.id].x) * (largeImpactView ? 0.006 : 0.012);
+      f[n.id].y += (H / 2 - pos[n.id].y) * (largeImpactView ? 0.006 : 0.012);
     });
 
     nodes.forEach(n => {
-      pos[n.id].x = Math.max(20, Math.min(W - 20, pos[n.id].x + f[n.id].x * 0.5));
-      pos[n.id].y = Math.max(20, Math.min(H - 20, pos[n.id].y + f[n.id].y * 0.5));
+      if (pos[n.id].fixed) return;
+      pos[n.id].x = Math.max(24, Math.min(W - 24, pos[n.id].x + f[n.id].x * 0.5));
+      pos[n.id].y = Math.max(28, Math.min(H - 28, pos[n.id].y + f[n.id].y * 0.5));
     });
+  }
+
+  if (largeImpactView) {
+    ctx.fillStyle = 'rgba(138,147,168,0.9)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    const hiddenText = hiddenChangedCount ? `; ${hiddenChangedCount} more listed below` : '';
+    ctx.fillText(`Top ${visibleChangedIds.size} of ${changedIds.size} changed nodes shown${hiddenText}`, 14, 20);
   }
 
   // Draw edges
@@ -1156,7 +1298,9 @@ function renderCFGraph(canvasId, graphNodes, graphEdges, mode, resolvedId) {
     const p   = pos[n.id];
     const lvl = mode === 'before' ? n.before_level : n.after_level;
     const isResolved = n.id === resolvedId && mode === 'after';
-    const r   = isResolved ? 13 : 8;
+    const diff = diffById.get(n.id);
+    const isChanged = Boolean(diff);
+    const r   = isResolved ? 13 : isChanged ? 9 : 8;
 
     let fill;
     if (isResolved)        fill = '#4f8ef7';
@@ -1180,6 +1324,14 @@ function renderCFGraph(canvasId, graphNodes, graphEdges, mode, resolvedId) {
     ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
     ctx.fillStyle = fill;
     ctx.fill();
+
+    if (isChanged && !isResolved) {
+      const improved = diff.delta < 0;
+      ctx.strokeStyle = improved ? '#5ef7a0cc' : '#f75e5ecc';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
 
     if (isResolved || n.id === resolvedId) {
       ctx.strokeStyle = '#ffffff88';

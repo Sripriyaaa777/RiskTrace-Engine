@@ -1,25 +1,19 @@
 {
-  "total_issues": 3000,
-  "total_dependencies": 4229,
+  "total_issues": 300,
+  "total_dependencies": 124,
   "status_distribution": {
-    "Blocked": 5,
-    "Open": 2154,
-    "Done": 660,
-    "In Progress": 181
+    "Done": 111,
+    "In Progress": 73,
+    "Open": 88,
+    "Blocked": 28
   },
-  "delayed_issues": 524,
-  "delayed_percentage": 17.5,
-  "issues_with_deadline": 529,
-  "avg_delay_days": 3560.65,
-  "max_delay_days": 7355.81,
-  "isolated_nodes": 653,
-  "nodes_in_dependency_graph": 2347,
-  "avg_in_degree": 2.56,
-  "max_in_degree": 67,
-  "edge_source_counts": {
-    "heuristic_inference": 2776,
-    "parent_child": 1167,
-    "explicit_link": 115,
-    "text_reference": 171
-  }
+  "delayed_issues": 70,
+  "delayed_percentage": 23.3,
+  "issues_with_deadline": 184,
+  "avg_delay_days": -1.03,
+  "max_delay_days": 29.68,
+  "isolated_nodes": 160,
+  "nodes_in_dependency_graph": 140,
+  "avg_in_degree": 1.22,
+  "max_in_degree": 3
 }

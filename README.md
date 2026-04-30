@@ -1,462 +1,432 @@
 # RiskTrace Engine
 
-RiskTrace Engine is a FastAPI-based risk analysis service for issue dependency graphs. It can run in:
+> Hybrid GenAI-based predictive risk detection over temporal Jira dependency graphs
 
-- `CSV mode`: reads `data/processed/issues.csv` and `data/processed/dependencies.csv`
-- `Neo4j mode`: reads the same processed data after loading it into Neo4j
+RiskTrace Engine ingests Jira-style issue data, builds a dependency graph, propagates downstream risk, runs counterfactual "what-if" analysis, and validates predictive delay detection on historical issue snapshots.
 
-The project also includes a standalone frontend dashboard in [issuegraph_ui.html](/Users/sreejith/Downloads/RiskTrace-Engine-main/issuegraph_ui.html) that talks to the backend over HTTP.
+The project now supports:
+- real Apache Jira BSON preprocessing
+- synthetic demo data for visualization
+- transformer-based prediction using `distilroberta-base`
+- optional Groq-powered LLM explanations
+- CSV-backed runtime and Neo4j graph loading support
 
-## Current Status
+## What The System Does
 
-The current codebase has been updated so that:
+RiskTrace has four main layers:
 
-- the broken local imports are fixed
-- the backend starts correctly in this repo layout
-- the preprocessor accepts Zenodo `issues.bson` and `issues.bson.gz` directly
-- BSON preprocessing now streams records instead of loading the full dump into memory first
-- you can optionally stream raw issues from MongoDB with `--mongodb-uri`
-- the Neo4j loader preserves issue fields and dependency metadata
-- the frontend endpoint wiring matches the backend routes
-- the dashboard LLM gate now checks `GROQ_API_KEY` consistently
+1. Data preprocessing
+- Parse raw Jira-like issue data from BSON, JSON, or CSV
+- Normalize dates, statuses, priorities, and descriptions
+- Extract explicit dependency links and infer some soft dependencies from text
 
-Verified locally in this workspace:
+2. Graph reasoning
+- Build a graph where:
+  - node = issue
+  - edge = dependency
+- Propagate delay/blocker risk through downstream dependencies
 
-- `python3 -m compileall` passes for the main Python files
-- `preprocess.py --synthetic` runs successfully
-- a fresh backend instance on `http://127.0.0.1:8001` returns valid responses for:
-  - `/health`
-  - `/dashboard`
-  - `/counterfactual/{issue_id}`
+3. Predictive modeling
+- Reconstruct issue state at historical time `T`
+- Encode issue text with a transformer embedding model
+- Combine embeddings with graph and temporal features
+- Predict whether an issue would later become delayed
 
-Not fully verified here:
+4. Decision support
+- Run counterfactual simulations like "what happens if I fix this issue now?"
+- Optionally explain findings using a Groq-hosted LLM
 
-- Neo4j mode, because that requires your local Neo4j instance and credentials
-- clicking through the HTML manually in a browser, although the frontend fetch targets match the working backend endpoints
+## Current Models Used
 
-## Project Layout
+### Core graph model
+- `RiskPropagationEngine`
+- Type: deterministic graph propagation
+- Role: compute cascading risk over dependency edges
+
+### Core predictive model
+- `roberta_embedding_logistic_regression`
+- Text encoder: `distilroberta-base`
+- Role: use Jira issue text + structured graph/time features to predict future delay risk
+
+### Optional LLM explanation model
+- Groq model: `llama-3.3-70b-versatile`
+- Role: summaries, explanations, recommendations, chat
+
+This means the project is best described as:
+
+`a hybrid GenAI + graph analytics + predictive ML system`
+
+## End-to-End Workflow
+
+```text
+Raw Jira Data (BSON / JSON / CSV)
+    ->
+Preprocessing
+    ->
+issues.csv + dependencies.csv
+    ->
+Graph backend (CSV or Neo4j)
+    ->
+RiskPropagationEngine
+    ->
+Counterfactual analysis / dashboard risk views
+    ->
+Snapshot feature builder at time T
+    ->
+distilroberta-base text embeddings
+    ->
+LogisticRegression classifier
+    ->
+Predictive validation metrics
+    ->
+Optional Groq LLM explanation layer
+```
+
+## Repository Structure
 
 ```text
 RiskTrace-Engine-main/
-├── agents.py
-├── build_graph.py
-├── csv_db.py
-├── data/
-│   └── processed/
-├── evaluate.py
-├── issuegraph_ui.html
-├── main.py
-├── preprocess.py
-├── requirements.txt
-└── risk_engine.py
+├── main.py                   FastAPI app and all API routes
+├── preprocess.py             Raw Jira preprocessing and synthetic data generation
+├── predictive_model.py       Transformer-based predictive training pipeline
+├── predictive_analysis.py    Historical replay and predictive validation
+├── risk_engine.py            Core dependency risk propagation
+├── agents.py                 Agent orchestration and explanation logic
+├── csv_db.py                 CSV graph backend
+├── build_graph.py            Neo4j graph loader
+├── issuegraph_ui.html        Single-file dashboard UI
+├── requirements.txt          Python dependencies
+└── data/
+    ├── processed/            Synthetic/demo processed data
+    ├── real_hadoop/          Real Apache Jira processed HADOOP slice
+    └── models/               Saved predictive model artifacts + embedding cache
 ```
 
-## What Works Together
+## Key Features
 
-Frontend requests in [issuegraph_ui.html](/Users/sreejith/Downloads/RiskTrace-Engine-main/issuegraph_ui.html) call these backend endpoints:
+- Time-aware Jira preprocessing
+- BSON support for real Apache Jira exports
+- Safe handling of malformed records
+- Explicit + soft dependency extraction
+- Temporal downstream risk propagation
+- Counterfactual graph simulation
+- Transformer-enhanced predictive delay detection
+- Cross-validation and temporal holdout evaluation
+- UI support for both synthetic and real Jira backends
 
-- `GET /health`
-- `GET /dashboard`
-- `GET /alerts`
-- `GET /risk/{issue_id}`
-- `POST /query`
-- `POST /counterfactual/{issue_id}`
+## Installation
 
-Those routes exist in [main.py](/Users/sreejith/Downloads/RiskTrace-Engine-main/main.py), so the frontend and backend are integrated at the API-contract level.
-
-## Dataset Support
-
-This repo supports two input paths:
-
-1. Synthetic demo data
-2. Real Apache Jira data from Zenodo
-
-Zenodo record:
-
-- [Apache Jira Issue Tracking Dataset](https://zenodo.org/records/7740379)
-
-Recommended download from that record:
-
-- `issues.bson.gz` or `issues.bson`
-
-The preprocessor now supports:
-
-- `.json`
-- `.jsonl`
-- `.csv`
-- `.bson`
-- `.bson.gz`
-
-## Quick Start
-
-### Option A: Run the app right now with the included processed CSV data
-
-This is the easiest path and does not require Neo4j.
-
-1. Create a local virtual environment:
+### 1. Create a virtual environment
 
 ```bash
 python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-2. Install dependencies:
+### 2. Install dependencies
 
 ```bash
-.venv/bin/python -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-3. Start the backend:
+## Running With Synthetic Data
 
-```bash
-.venv/bin/uvicorn main:app --reload --port 8000
-```
+Synthetic mode is best for demos because it has a denser dependency graph and more visually obvious cascades.
 
-4. Open the frontend:
-
-- open [issuegraph_ui.html](/Users/sreejith/Downloads/RiskTrace-Engine-main/issuegraph_ui.html) in your browser
-- when prompted for the API base URL, enter:
-
-```text
-http://localhost:8000
-```
-
-### Option B: Regenerate processed CSV data from the real Zenodo dataset
-
-1. Download `issues.bson.gz` or `issues.bson` from the Zenodo record.
-
-2. Run preprocessing:
-
-```bash
-.venv/bin/python preprocess.py --input /absolute/path/to/issues.bson --project HADOOP --max-issues 300
-```
-
-This writes:
-
-- `data/processed/issues.csv`
-- `data/processed/dependencies.csv`
-- `data/processed/stats.json`
-
-3. Start the backend:
-
-```bash
-.venv/bin/uvicorn main:app --reload --port 8000
-```
-
-4. Open [issuegraph_ui.html](/Users/sreejith/Downloads/RiskTrace-Engine-main/issuegraph_ui.html) and connect to `http://localhost:8000`.
-
-### Option C: Run with Neo4j
-
-1. Start your local Neo4j database.
-
-2. Create a `.env` file in the project root:
-
-```env
-USE_NEO4J=true
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password_here
-MONITOR_INTERVAL=60
-
-# Optional
-# GROQ_API_KEY=your_groq_api_key_here
-```
-
-3. Prepare processed CSVs from either:
-
-- the real Zenodo BSON file
-- or synthetic data
-
-Real data:
-
-```bash
-.venv/bin/python preprocess.py --input /absolute/path/to/issues.bson --project HADOOP --max-issues 300
-```
-
-Synthetic fallback:
-
-```bash
-.venv/bin/python preprocess.py --synthetic --max-issues 300
-```
-
-4. Load the processed graph into Neo4j:
-
-```bash
-.venv/bin/python build_graph.py
-```
-
-5. Start the backend:
-
-```bash
-.venv/bin/uvicorn main:app --reload --port 8000
-```
-
-6. Open [issuegraph_ui.html](/Users/sreejith/Downloads/RiskTrace-Engine-main/issuegraph_ui.html) and connect to `http://localhost:8000`.
-
-## Recommended `.env` Files
-
-### CSV mode
-
-```env
-USE_NEO4J=false
-MONITOR_INTERVAL=60
-
-# Optional
-# GROQ_API_KEY=your_groq_api_key_here
-```
-
-### Neo4j mode
-
-```env
-USE_NEO4J=true
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password_here
-MONITOR_INTERVAL=60
-
-# Optional
-# GROQ_API_KEY=your_groq_api_key_here
-```
-
-## End-to-End Run Guide
-
-If you want the shortest successful path, do exactly this from the project root:
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-cat > .env <<'EOF'
-USE_NEO4J=false
-MONITOR_INTERVAL=60
-EOF
-.venv/bin/uvicorn main:app --reload --port 8000
-```
-
-Then:
-
-- open [issuegraph_ui.html](/Users/sreejith/Downloads/RiskTrace-Engine-main/issuegraph_ui.html)
-- connect it to `http://localhost:8000`
-- click `Refresh Data`
-- use `Risk Board`, `Action Plan`, and `What-If`
-
-## API Endpoints
-
-### Health
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Expected shape:
-
-```json
-{
-  "status": "ok",
-  "db_mode": "csv",
-  "pipeline": true,
-  "data_loaded": true
-}
-```
-
-### Dashboard
-
-```bash
-curl http://127.0.0.1:8000/dashboard
-```
-
-Returns:
-
-- summary cards
-- top risky issues
-- action plan
-- LLM analysis if `GROQ_API_KEY` is set
-
-### Counterfactual
-
-```bash
-curl -X POST http://127.0.0.1:8000/counterfactual/HADOOP-16 \
-  -H "Content-Type: application/json" \
-  -d '{"resolve_as":"Done"}'
-```
-
-Returns:
-
-- `diff`
-- `graph_nodes`
-- `graph_edges`
-- `impact_summary`
-
-### Swagger docs
-
-```text
-http://localhost:8000/docs
-```
-
-## Frontend Usage
-
-The frontend is a single HTML file and does not require a build step.
-
-Features available in the UI:
-
-- dashboard summary
-- risk board
-- action plan
-- alerts fetch
-- AI query drawer
-- counterfactual what-if analysis
-
-The frontend stores the API base URL in browser `localStorage` under `igraph_api`.
-
-## MongoDB Option
-
-If you restore the BSON dump into MongoDB, you can preprocess directly from MongoDB instead of repeatedly reading the raw BSON file from disk.
-
-Example:
-
-```bash
-.venv/bin/python preprocess.py \
-  --mongodb-uri mongodb://localhost:27017 \
-  --mongodb-db apache_jira \
-  --mongodb-collection issues \
-  --project HADOOP \
-  --max-issues 300
-```
-
-This is useful if:
-
-- you already loaded the dump with `mongorestore`
-- you want repeated preprocessing runs to be faster
-
-## How to Use the Real Dataset
-
-Example with the Hadoop slice:
-
-```bash
-.venv/bin/python preprocess.py \
-  --input /absolute/path/to/issues.bson \
-  --project HADOOP \
-  --max-issues 300
-```
-
-Notes:
-
-- `--project HADOOP` keeps the graph smaller and easier to inspect
-- `--max-issues 300` is a good starting point for responsiveness
-- you can swap `HADOOP` for another project key present in the dataset
-
-## Synthetic Data Fallback
-
-If you only want to check the app quickly:
-
-```bash
-.venv/bin/python preprocess.py --synthetic --max-issues 300
-```
-
-This generates a dependency graph with delays and blockers so the dashboard has meaningful risk signals.
-
-## Troubleshooting
-
-### `Pipeline not ready`
-
-Cause:
-
-- processed CSVs do not exist yet
-
-Fix:
+### 1. Generate synthetic processed data
 
 ```bash
 .venv/bin/python preprocess.py --synthetic
 ```
 
-or run the real BSON preprocessing command.
+This creates:
+- `data/processed/issues.csv`
+- `data/processed/dependencies.csv`
 
-### Port `8000` is already in use
-
-Start on a different port:
-
-```bash
-.venv/bin/uvicorn main:app --reload --port 8001
-```
-
-Then connect the HTML dashboard to:
-
-```text
-http://localhost:8001
-```
-
-### Neo4j mode falls back to CSV mode
-
-Cause:
-
-- Neo4j is not running
-- wrong credentials
-- wrong `NEO4J_URI`
-
-Fix:
-
-- confirm Neo4j is started
-- verify `.env`
-- rerun `build_graph.py`
-
-### `bson` import error during preprocessing
-
-Cause:
-
-- dependencies were not installed in the local venv
-
-Fix:
+### 2. Start the synthetic backend
 
 ```bash
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8005
 ```
 
-### No LLM explanations in dashboard
+### 3. Open the UI
 
-Cause:
+Serve the static UI:
 
-- `GROQ_API_KEY` not set
+```bash
+python3 -m http.server 9000
+```
 
-Fix:
+Then open:
 
-Add this to `.env`:
+- UI: [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8005](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8005)
+
+## Running With Real Apache Jira Data
+
+The current real-data setup uses a processed HADOOP slice derived from the Apache Jira BSON dataset.
+
+### 1. Preprocess the raw BSON data
+
+Example:
+
+```bash
+.venv/bin/python preprocess.py \
+  --input ../Downloads/issues.bson \
+  --project HADOOP \
+  --max-issues 1500 \
+  --output-dir data/real_hadoop
+```
+
+Expected outputs:
+- `data/real_hadoop/issues.csv`
+- `data/real_hadoop/dependencies.csv`
+
+### 2. Start the real Jira backend
+
+```bash
+ISSUES_CSV=data/real_hadoop/issues.csv \
+DEPS_CSV=data/real_hadoop/dependencies.csv \
+.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+### 3. Open the UI
+
+- UI: [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004)
+- Docs: [http://127.0.0.1:8004/docs](http://127.0.0.1:8004/docs)
+
+## Current Real Jira Slice
+
+Current verified HADOOP slice:
+- `1500` issues
+- `186` dependency edges
+- CSV runtime mode
+
+This real slice is useful for validation, but it is noticeably sparser than the synthetic graph.
+
+## Training The Predictive Model
+
+Train the current transformer-based predictor:
+
+```bash
+.venv/bin/python predictive_model.py \
+  --issues data/real_hadoop/issues.csv \
+  --deps data/real_hadoop/dependencies.csv \
+  --project HADOOP \
+  --folds 5 \
+  --model-path data/models/predictive_model.joblib \
+  --text-encoder-model distilroberta-base
+```
+
+This:
+- encodes issue text with `distilroberta-base`
+- combines embeddings with graph/time features
+- trains a logistic regression classifier
+- reports cross-validation and temporal holdout metrics
+- saves the model artifact
+
+## Predictive API Endpoints
+
+### Train predictive model
+
+`POST /train-predictive-model`
+
+Query params:
+- `project`
+- `folds`
+- `text_encoder_model`
+
+Example:
+
+```bash
+curl -X POST "http://127.0.0.1:8004/train-predictive-model?project=HADOOP&folds=5&text_encoder_model=distilroberta-base"
+```
+
+### Predictive analysis
+
+`GET /predictive-analysis`
+
+Query params:
+- `project`
+- `threshold`
+- `positive_target`
+- `total_target`
+- `use_trained_model`
+
+Example:
+
+```bash
+curl "http://127.0.0.1:8004/predictive-analysis?project=HADOOP&positive_target=5&total_target=8&use_trained_model=true"
+```
+
+### Predictive model metadata
+
+`GET /predictive-model-info`
+
+Returns:
+- model kind
+- encoder model
+- trained time
+- project
+
+## Main API Endpoints
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/health` | Health check and active DB mode |
+| GET | `/dashboard` | Dashboard summary, top risks, action plan |
+| GET | `/risk/{issue_id}` | Risk details for a single issue |
+| GET | `/graph/{issue_id}` | Issue-centered dependency graph |
+| GET | `/alerts` | Monitoring alerts |
+| POST | `/query` | Natural language agent query |
+| POST | `/counterfactual/{issue_id}` | What-if graph simulation |
+| POST | `/train-predictive-model` | Train predictive delay model |
+| GET | `/predictive-analysis` | Historical predictive validation |
+| GET | `/predictive-model-info` | Active predictive model metadata |
+
+## UI Features
+
+The dashboard in [issuegraph_ui.html](/Users/sreejith/RiskTrace-Engine-main%202/issuegraph_ui.html) includes:
+
+- Dashboard summary
+- Risk board
+- Action plan
+- Alerts
+- What-If analysis
+- Predictive model summary panel
+- Dataset switching between:
+  - real Jira backend
+  - synthetic backend
+
+## Counterfactual What-If Analysis
+
+The What-If tab lets a manager test:
+
+`What happens if this issue is resolved right now?`
+
+Workflow:
+- clone the current graph in memory
+- mark the selected issue as resolved
+- rerun risk propagation
+- compare before vs after
+
+Output includes:
+- nodes improved
+- high-risk reduction
+- delay-days saved
+- before/after graph diff
+- node-level deltas
+
+## Current Verified Results
+
+### Real Jira predictive model
+
+On the current HADOOP slice:
+- model kind: `roberta_embedding_logistic_regression`
+- encoder: `distilroberta-base`
+
+5-fold cross-validation average:
+- precision: `0.910`
+- recall: `0.933`
+- accuracy: `0.998`
+- f1: `0.909`
+- roc_auc: `0.967`
+
+Temporal holdout:
+- precision: `0.857`
+- recall: `0.667`
+- accuracy: `0.987`
+- f1: `0.750`
+- roc_auc: `0.954`
+
+Example predictive-analysis run:
+- precision: `1.000`
+- recall: `1.000`
+- accuracy: `1.000`
+
+These numbers are on a small real-data slice and should be interpreted cautiously.
+
+## Groq / LLM Support
+
+To enable LLM explanations, add:
 
 ```env
 GROQ_API_KEY=your_key_here
 ```
 
-The risk engine still works without it.
+This powers:
+- dashboard LLM summary
+- recommendations
+- natural language chat
 
-## Known Notes
+Without Groq, the core graph engine, predictive model, and counterfactual simulation still work.
 
-- The app can run fully in CSV mode without Neo4j.
-- Neo4j mode uses the same processed CSVs as the source for graph loading.
-- The existing process already running on your `localhost:8000` during verification returned `500`, so if you see that behavior, stop that older process and restart using the commands in this README.
+## Neo4j Support
 
-## Useful Commands
+Neo4j graph loading still exists through [build_graph.py](/Users/sreejith/RiskTrace-Engine-main%202/build_graph.py), but the current verified live Jira run is CSV-backed.
 
-Rebuild synthetic data:
+To use Neo4j, provide:
 
-```bash
-.venv/bin/python preprocess.py --synthetic --max-issues 300
+```env
+USE_NEO4J=true
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
 ```
 
-Build from real BSON:
-
-```bash
-.venv/bin/python preprocess.py --input /absolute/path/to/issues.bson --project HADOOP --max-issues 300
-```
-
-Load into Neo4j:
+Then load data with:
 
 ```bash
 .venv/bin/python build_graph.py
 ```
 
-Run backend:
+## Known Limitation: Real Jira Dependency Sparsity
 
-```bash
-.venv/bin/uvicorn main:app --reload --port 8000
-```
+The main limitation is the dataset, not the pipeline.
 
-## Summary
+Problems with the real Apache Jira dataset:
+- relatively few explicit dependency links
+- inconsistent workflow/status semantics
+- incomplete due-date coverage
+- many hidden dependencies only implied in text/comments
+- weaker graph density than synthetic demo data
 
-Yes, the current updated backend is now starting correctly, and the frontend is wired to the right endpoints. The version I verified works in CSV mode. Neo4j mode should work once your local Neo4j instance is running and loaded with `build_graph.py`.
+Effects:
+- real graphs look sparser
+- counterfactual improvements are often smaller
+- what-if views can be less visually dramatic
+
+## How To Improve The Real Jira Pipeline
+
+Recommended next steps:
+
+1. Improve dependency extraction
+- normalize Jira link types more carefully
+- infer stronger soft dependencies from text/comments
+
+2. Improve labels
+- define cleaner delay labels
+- add blocker and downstream-impact labels
+
+3. Improve temporal reconstruction
+- ensure every feature uses only information available at time `T`
+
+4. Explore richer project slices
+- compare HADOOP with KAFKA or SPARK
+
+5. Upgrade graph learning
+- add a graph neural network or stronger learned graph component
+
+## Project Positioning
+
+This project now qualifies as:
+
+`a hybrid GenAI project`
+
+Why:
+- transformer embeddings are used in the core prediction pipeline
+- Groq LLM can be used for explanations
+- graph reasoning remains central for explainability and counterfactual analysis
+
+Most accurate description:
+
+`Hybrid GenAI-based predictive risk detection over temporal Jira dependency graphs`
