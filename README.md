@@ -161,9 +161,9 @@ Then open:
 
 - UI: [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8005](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8005)
 
-## Running With Real Apache Jira Data
+## Recommended Run: Real Apache Jira + Neo4j + UI
 
-The current real-data setup uses a processed HADOOP slice derived from the Apache Jira BSON dataset.
+This is the current presentation-ready setup. It uses the real Apache Jira HADOOP slice, imports the graph into Neo4j, runs the FastAPI backend in Neo4j mode, and serves the dashboard UI.
 
 ### 1. Preprocess the raw BSON data
 
@@ -174,34 +174,111 @@ Example:
   --input ../Downloads/issues.bson \
   --project HADOOP \
   --max-issues 1500 \
-  --output-dir data/real_hadoop
+  --output-dir data/real_hadoop \
+  --augment-soft-deps
 ```
 
 Expected outputs:
 - `data/real_hadoop/issues.csv`
 - `data/real_hadoop/dependencies.csv`
+- `data/real_hadoop/stats.json`
 
-### 2. Start the real Jira backend
+The CSV files here are a staging format: they normalize raw Jira records into a graph schema before loading Neo4j.
+
+### 2. Start Neo4j
+
+If the local Neo4j container already exists:
 
 ```bash
+docker start risktrace-neo4j
+```
+
+If you need to create it:
+
+```bash
+docker run --name risktrace-neo4j \
+  -p 7474:7474 \
+  -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/risktrace123 \
+  -d neo4j:5
+```
+
+Neo4j Browser:
+
+- [http://127.0.0.1:7474](http://127.0.0.1:7474)
+- username: `neo4j`
+- password: `risktrace123`
+
+### 3. Load the Jira graph into Neo4j
+
+```bash
+NEO4J_URI=bolt://127.0.0.1:7687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=risktrace123 \
+ISSUES_CSV=data/real_hadoop/issues.csv \
+DEPS_CSV=data/real_hadoop/dependencies.csv \
+.venv/bin/python build_graph.py
+```
+
+### 4. Start the real Jira backend in Neo4j mode
+
+```bash
+USE_NEO4J=true \
+NEO4J_URI=bolt://127.0.0.1:7687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=risktrace123 \
 ISSUES_CSV=data/real_hadoop/issues.csv \
 DEPS_CSV=data/real_hadoop/dependencies.csv \
 .venv/bin/uvicorn main:app --host 127.0.0.1 --port 8004
 ```
 
-### 3. Open the UI
+Verify:
+
+```bash
+curl http://127.0.0.1:8004/health
+```
+
+Expected:
+
+```json
+{
+  "status": "ok",
+  "db_mode": "neo4j",
+  "data_loaded": true
+}
+```
+
+### 5. Serve and open the UI
+
+In another terminal:
+
+```bash
+python3 -m http.server 9000
+```
+
+Open:
 
 - UI: [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004)
 - Docs: [http://127.0.0.1:8004/docs](http://127.0.0.1:8004/docs)
+
+The UI should show:
+
+```text
+Connected
+backend: neo4j
+CSV staging imported to graph
+```
+
+That means Neo4j is the active backend. CSV is only the import/staging format produced by preprocessing.
 
 ## Current Real Jira Slice
 
 Current verified HADOOP slice:
 - `1500` issues
-- `186` dependency edges
-- CSV runtime mode
+- `4353` dependency edges after soft-dependency augmentation
+- Neo4j runtime mode
 
-This real slice is useful for validation, but it is noticeably sparser than the synthetic graph.
+Important caveat: most Jira projects have sparse explicit dependency links. The enhanced graph includes inferred soft dependencies from issue text/project context, so downstream impact should be interpreted as a decision-support signal, not guaranteed causality.
 
 ## Training The Predictive Model
 
@@ -362,18 +439,18 @@ Without Groq, the core graph engine, predictive model, and counterfactual simula
 
 ## Neo4j Support
 
-Neo4j graph loading still exists through [build_graph.py](/Users/sreejith/RiskTrace-Engine-main%202/build_graph.py), but the current verified live Jira run is CSV-backed.
+Neo4j graph loading is implemented in `build_graph.py`. The current verified live Jira run uses Neo4j as the active graph backend.
 
 To use Neo4j, provide:
 
 ```env
 USE_NEO4J=true
-NEO4J_URI=bolt://localhost:7687
+NEO4J_URI=bolt://127.0.0.1:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
 ```
 
-Then load data with:
+Load data with:
 
 ```bash
 .venv/bin/python build_graph.py
