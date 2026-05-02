@@ -153,6 +153,327 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Quick Start
+
+If you just want the app running locally with the default processed dataset:
+
+### Terminal 1 — start the backend
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+source .venv/bin/activate
+.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+### Terminal 2 — serve the UI
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+python3 -m http.server 9000 --bind 127.0.0.1
+```
+
+### Open in browser
+
+- UI: [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004)
+- Health: [http://127.0.0.1:8004/health](http://127.0.0.1:8004/health)
+- API docs: [http://127.0.0.1:8004/docs](http://127.0.0.1:8004/docs)
+
+Expected health response:
+
+```json
+{
+  "status": "ok",
+  "pipeline_type": "RiskTraceAgenticPipeline",
+  "rag_ready": true
+}
+```
+
+This quick start uses:
+- CSV mode
+- local TF-IDF RAG
+- agentic pipeline
+- optional Groq LLM if `GROQ_API_KEY` is present in `.env`
+
+## Detailed Run Guide
+
+This section explains the exact commands for the three main ways to run the project:
+
+1. local default CSV mode
+2. real Jira + Neo4j mode
+3. upload-your-own-dataset product flow
+
+---
+
+## Run Mode 1: Local Default CSV Mode
+
+This is the fastest way to run the project for development and demos.
+
+### What it uses
+
+- `data/processed/issues.csv`
+- `data/processed/dependencies.csv`
+- local TF-IDF RAG index in `data/rag_index`
+- `RiskTraceAgenticPipeline`
+
+### Start backend
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+source .venv/bin/activate
+.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+### Start UI
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+python3 -m http.server 9000 --bind 127.0.0.1
+```
+
+### Open
+
+- [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004)
+
+### Verify backend
+
+```bash
+curl http://127.0.0.1:8004/health
+curl http://127.0.0.1:8004/rag-status
+curl "http://127.0.0.1:8004/agent-trace?query=Why%20is%20HADOOP-8%20high%20risk%3F"
+```
+
+What you should see:
+
+- `/health`
+  - `pipeline_type: RiskTraceAgenticPipeline`
+  - `rag_ready: true`
+- `/rag-status`
+  - `backend: local_tfidf`
+- `/agent-trace`
+  - `execution_path` includes `perception`, `rag_retrieval`, `planning`, `decision`, `critic`
+
+---
+
+## Run Mode 2: Real Apache Jira + Neo4j
+
+This is the heavier, presentation-ready graph database setup.
+
+### Step 1 — preprocess the raw BSON into a slice
+
+Example for `HADOOP`:
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+source .venv/bin/activate
+
+.venv/bin/python preprocess.py \
+  --input ../Downloads/issues.bson \
+  --project HADOOP \
+  --max-issues 1500 \
+  --output-dir data/real_hadoop \
+  --augment-soft-deps
+```
+
+Expected outputs:
+
+- `data/real_hadoop/issues.csv`
+- `data/real_hadoop/dependencies.csv`
+- `data/real_hadoop/stats.json`
+
+### Step 2 — start Neo4j
+
+If the container already exists:
+
+```bash
+docker start risktrace-neo4j
+```
+
+If you need to create it:
+
+```bash
+docker run --name risktrace-neo4j \
+  -p 7474:7474 \
+  -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/risktrace123 \
+  -d neo4j:5
+```
+
+### Step 3 — import the graph into Neo4j
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+
+NEO4J_URI=bolt://127.0.0.1:7687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=risktrace123 \
+ISSUES_CSV=data/real_hadoop/issues.csv \
+DEPS_CSV=data/real_hadoop/dependencies.csv \
+.venv/bin/python build_graph.py
+```
+
+### Step 4 — start backend in Neo4j mode
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+
+USE_NEO4J=true \
+NEO4J_URI=bolt://127.0.0.1:7687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=risktrace123 \
+ISSUES_CSV=data/real_hadoop/issues.csv \
+DEPS_CSV=data/real_hadoop/dependencies.csv \
+.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+### Step 5 — start UI
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+python3 -m http.server 9000 --bind 127.0.0.1
+```
+
+### Step 6 — verify
+
+```bash
+curl http://127.0.0.1:8004/health
+```
+
+Expected:
+
+```json
+{
+  "status": "ok",
+  "db_mode": "neo4j"
+}
+```
+
+In the UI you should see:
+
+```text
+Connected
+backend: neo4j
+CSV staging imported to graph
+```
+
+That means:
+- raw Jira was normalized into CSV
+- CSV was loaded into Neo4j
+- backend is now querying Neo4j
+
+---
+
+## Run Mode 3: Upload Your Own Dataset
+
+This is the product-style workflow inside the UI.
+
+### Step 1 — start backend
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+source .venv/bin/activate
+.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+### Step 2 — start UI
+
+```bash
+cd /path/to/RiskTrace-Engine-main
+python3 -m http.server 9000 --bind 127.0.0.1
+```
+
+### Step 3 — open UI
+
+- [http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004](http://127.0.0.1:9000/issuegraph_ui.html?api=http://127.0.0.1:8004)
+
+### Step 4 — use Settings
+
+1. open `Settings`
+2. upload a dataset file:
+   - BSON
+   - JSON
+   - CSV
+3. choose the uploaded dataset
+4. choose a project slice such as:
+   - `HADOOP`
+   - `SPARK`
+   - `HIVE`
+   - `HBASE`
+5. choose max issues per slice
+6. click `Prepare Slice & Activate`
+
+### What happens internally
+
+```text
+raw uploaded dataset
+-> discover projects
+-> prepare selected slice
+-> generate issues.csv + dependencies.csv
+-> activate slice in backend
+-> refresh dashboard
+-> rebuild or reuse local RAG index
+```
+
+### Performance notes
+
+- first activation of a brand-new slice is slower
+- activating an already prepared slice is faster
+- selecting the exact same active slice reuses the running runtime when possible
+
+---
+
+## Optional Groq LLM Setup
+
+To enable full natural-language explanations in the dashboard and agent chat:
+
+Create `.env` in the project root:
+
+```env
+GROQ_API_KEY=your_key_here
+```
+
+Then restart the backend:
+
+```bash
+pkill -f "uvicorn main:app --host 127.0.0.1 --port 8004"
+.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+Without Groq:
+- graph logic still works
+- predictive model still works
+- counterfactual analysis still works
+- RAG still works
+- agentic routing still works
+- only the natural-language LLM summary falls back to structured text
+
+---
+
+## Stop / Restart Commands
+
+### Stop backend
+
+```bash
+pkill -f "uvicorn main:app --host 127.0.0.1 --port 8004"
+```
+
+### Stop UI server
+
+```bash
+pkill -f "http.server 9000"
+```
+
+### Restart backend
+
+```bash
+.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8004
+```
+
+### Restart UI server
+
+```bash
+python3 -m http.server 9000 --bind 127.0.0.1
+```
+
 ## Recommended Run: Real Apache Jira + Neo4j + UI
 
 This is the current presentation-ready setup. It uses the real Apache Jira HADOOP slice, imports the graph into Neo4j, runs the FastAPI backend in Neo4j mode, and serves the dashboard UI.
