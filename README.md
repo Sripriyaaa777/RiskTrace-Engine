@@ -1,270 +1,411 @@
+<div align="center">
 
-# IssueGraphAgent++ 🔍
+# 🔥 RiskTrace Engine
 
-> A Multi-Agent Generative AI Framework for Proactive Risk Propagation  
-> over Temporal Dependency Graphs in Software Project Management
+### *Proactive Risk Intelligence for Software Projects*
 
-**Proactive risk propagation and counterfactual reasoning over software project dependency graphs.**
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Store-FF6B35?style=flat-square)](https://trychroma.com)
+[![Groq](https://img.shields.io/badge/Groq-LLaMA_3.3_70B-F55036?style=flat-square)](https://console.groq.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-RiskTrace Engine ingests issue-tracker data (JIRA-style tickets), builds a temporal dependency graph, and continuously propagates risk scores from delayed or blocked tasks downstream — alerting teams *before* cascades become critical.
+**RiskTrace Engine** ingests issue-tracker data, builds a live temporal dependency graph, and continuously propagates risk scores from delayed or blocked tasks downstream — surfacing cascades *before* they become critical.
 
-The centerpiece novel contribution is **Counterfactual What-If Analysis**: a manager can hypothetically resolve any issue and instantly see how downstream risk scores change, enabling principled prioritisation decisions backed by quantitative impact estimates.
-
----
-
-## Key Features
-
-- **Multi-hop temporal risk propagation** — Risk decays with graph distance (γ = 0.8 per hop) and issue staleness, producing a principled score in [0, 1] for every node
-- **Counterfactual reasoning** — In-memory graph clone + re-propagation; no database writes. Shows before/after risk scores and a visual graph diff
-- **Multi-agent pipeline** — Six agents: Perception, Graph Reasoning, Planning, Decision (LLM), Monitoring, Critic
-- **Two backend modes** — CSV mode (no Neo4j needed) or full Neo4j mode; switch with one env variable
-- **Dark-themed dashboard UI** — Risk board, action plan, alerts, and What-If tab; pure HTML, no build step
+[Features](#-features) • [Architecture](#-architecture) • [Quickstart](#-quickstart) • [API](#-api-reference) • [What-If Analysis](#-what-if-counterfactual-analysis) • [RAG](#-semantic-rag-retrieval)
 
 ---
 
-## How It Works
+</div>
+
+## ✨ Features
+
+| | Feature | Description |
+|---|---|---|
+| 🕸️ | **Temporal Dependency Graph** | Builds a directed risk graph from JIRA-style CSVs or Neo4j — 300 synthetic issues, 12,700+ real Hadoop issues supported |
+| 📉 | **Multi-hop Risk Propagation** | Risk decays with graph distance (γ = 0.8/hop) and issue staleness — every node gets a principled score in [0, 1] |
+| 🔮 | **Counterfactual What-If** | Hypothetically resolve any issue and instantly see cascading before/after risk diffs — zero DB writes |
+| 🤖 | **6-Agent Pipeline** | Perception → Graph Reasoning → Planning → Decision (LLM) → Monitoring → Critic |
+| 🔍 | **Semantic RAG Retrieval** | ChromaDB + `all-MiniLM-L6-v2` embeddings replace keyword matching — "tasks behind schedule" correctly matches "overdue", "blocked", "delayed" |
+| 🧠 | **LLM Explanations** | Groq LLaMA 3.3 70B generates root cause summaries and prioritised action plans |
+| 📡 | **Live Monitoring** | Background agent polls for state changes and upserts the vector index — retrieval always reflects current graph state |
+| 🖥️ | **Zero-build Dashboard** | Single HTML file — open directly in browser, no npm or build step |
+| 🔀 | **Dual Backend** | CSV mode (no database needed) or Neo4j mode — switch with one env variable |
+
+---
+
+## 🏗️ Architecture
 
 ```
-Issues CSV + Dependencies CSV  (or Neo4j graph)
-          │
-          ▼
-    PerceptionAgent          fetches nodes + edges
-          │
-          ▼
-  GraphReasoningAgent        runs RiskPropagationEngine
-          │
-          ▼
-   RiskPropagationEngine     R(v) = Σ [ severity × γ^depth × temporal_weight ]
-          │
-          ├──▶ PlanningAgent      ranked mitigation plan
-          ├──▶ DecisionAgent      LLM explanation (optional)
-          ├──▶ MonitoringAgent    background watcher, proactive alerts
-          └──▶ CriticAgent        validates LLM outputs
+┌─────────────────────────────────────────────────────────────────┐
+│                        RiskTrace Engine                          │
+│                                                                   │
+│  Issues CSV / Neo4j                                              │
+│         │                                                         │
+│         ▼                                                         │
+│  ┌─────────────────┐     fetches nodes + edges                   │
+│  │ PerceptionAgent │────────────────────────────────┐            │
+│  └─────────────────┘                                │            │
+│         │                                           │            │
+│         ▼                                           ▼            │
+│  ┌──────────────────────┐          ┌────────────────────────┐   │
+│  │ GraphReasoningAgent  │          │   MonitoringAgent      │   │
+│  │  RiskPropagationEngine│         │  (background thread)   │   │
+│  │  R(v) = Σ γ^d × sev │          │  detects state changes │   │
+│  └──────────────────────┘          └────────────────────────┘   │
+│         │                                     │                  │
+│    ┌────┴──────────┐                          │ upsert           │
+│    │               │                          ▼                  │
+│    ▼               ▼               ┌──────────────────────┐     │
+│  PlanningAgent  RAGRetriever       │  ChromaDB Vector DB  │     │
+│  (mitigation)   (semantic search)  │  all-MiniLM-L6-v2    │     │
+│    │               │               └──────────────────────┘     │
+│    └───────┬───────┘                                             │
+│            ▼                                                      │
+│    ┌───────────────┐     LLaMA 3.3 70B via Groq                 │
+│    │ DecisionAgent │────────────────────────────                 │
+│    └───────────────┘                                             │
+│            │                                                      │
+│            ▼                                                      │
+│    ┌───────────────┐     validates hallucinations                │
+│    │  CriticAgent  │     strips invalid issue IDs               │
+│    └───────────────┘                                             │
+│            │                                                      │
+│            ▼                                                      │
+│       FastAPI REST  →  issuegraph_ui.html                        │
+└─────────────────────────────────────────────────────────────────┘
 
-What-If:
-  Manager selects issue → POST /counterfactual/{id}
-  → clone graph in memory → patch node to Done → re-propagate
-  → return before/after diff + graph_nodes for visual rendering
-```
 
-**Risk Score Formula:**
 ```
-R(v) = Σ [ delay_severity(u) × γ^(depth-1) × temporal_weight(u) ]
+![RiskTrace Architecture](risktrace_block_diagram.png)
+### Risk Score Formula
+
+```
+R(v) = Σ [ delay_severity(u) × γ^(depth−1) × temporal_weight(u) ]
        for each upstream risky ancestor u at depth d
 
-delay_severity = min(delay_days / 30, 1.0)   for delayed nodes
-               = 1.0                          for blocked nodes
-γ (depth decay) = 0.80
-temporal_weight = 0.5 + 0.5 × e^(−age_days / 30)
+delay_severity(u) = min(delay_days / 30, 1.0)    ← delayed nodes
+                  = 1.0                            ← blocked nodes
+γ  (depth decay)  = 0.80 per hop
+temporal_weight   = 0.5 + 0.5 × e^(−age_days / 30)
 ```
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-RiskTrace-Engine-main/
-├── main.py            FastAPI app — all routes including /counterfactual
-├── agents.py          All six agents + AgentPipeline orchestrator
-├── risk_engine.py     Core propagation algorithm (Neo4j-agnostic)
-├── csv_db.py          In-memory CSV graph DB (drop-in Neo4j replacement)
-├── build_graph.py     Neo4j graph builder (used in Neo4j mode)
-├── preprocess.py      Synthetic data generator
-├── evaluate.py        Evaluation + benchmarking utilities
-├── issuegraph_ui.html Single-file dashboard (open directly in browser)
-└── requirements.txt   Python dependencies
+RiskTrace-Engine/
+│
+├── agents.py              ← All 6 agents + RAGRetriever + AgentPipeline orchestrator
+├── main.py                ← FastAPI app — all REST endpoints
+├── risk_engine.py         ← Core propagation algorithm (DB-agnostic)
+├── csv_db.py              ← In-memory CSV graph DB (Neo4j drop-in replacement)
+├── build_graph.py         ← Neo4j graph loader
+├── preprocess.py          ← Synthetic data generator
+├── predictive_model.py    ← ML-based risk prediction
+├── predictive_analysis.py ← Predictive analysis utilities
+├── evaluate.py            ← Evaluation & benchmarking
+├── issuegraph_ui.html     ← Single-file dashboard (no build step)
+├── requirements.txt       ← Python dependencies
+│
+└── data/
+    ├── processed/         ← 300 synthetic issues, 124 dependencies
+    └── real_hadoop/       ← 12,740 real Apache Hadoop JIRA issues
 ```
 
 ---
 
-## Quickstart — Mode A: CSV (No Neo4j Required)
+## 🚀 Quickstart
 
-This is the recommended way to get started. Everything runs locally with no database setup.
+### Mode A — CSV (No Database Required) ✅ Recommended
 
-### 1. Clone the repository
+**1. Clone and install**
 ```bash
 git clone https://github.com/YOUR_USERNAME/RiskTrace-Engine.git
-cd RiskTrace-Engine-main
-```
-
-### 2. Install dependencies
-```bash
+cd RiskTrace-Engine
 pip install -r requirements.txt
 ```
 
-### 3. Create your `.env` file
-Create a file named `.env` in the project root:
+**2. Create `.env`**
 ```env
 USE_NEO4J=false
 MONITOR_INTERVAL=60
 
-# Optional — add for LLM explanations in the dashboard
+# Optional — enables LLM explanations and AI chat
 # GROQ_API_KEY=your_groq_key_here
 ```
 
-### 4. Generate synthetic data
+**3. Generate synthetic data**
 ```bash
 python preprocess.py --synthetic
 ```
-This creates `data/processed/issues.csv` and `data/processed/dependencies.csv` — around 200 synthetic issues with realistic dependency chains, delays, and blocked tasks.
 
-### 5. Start the API server
+**4. Start the server**
 ```bash
 uvicorn main:app --reload --port 8000
 ```
-Expected output:
+
 ```
 ✓ Running in CSV mode
+RAGRetriever initialised with model 'all-MiniLM-L6-v2'
+RAGRetriever: indexed 300 issues
 IssueGraphAgent++ ready  [mode: csv]
 ```
 
-### 6. Open the dashboard
-Open `issuegraph_ui.html` directly in your browser (double-click the file or drag it into your browser). When prompted for the API URL, enter:
-```
-http://localhost:8000
-```
+**5. Open the dashboard**
+
+Open `issuegraph_ui.html` in your browser and enter `http://localhost:8000` when prompted.
 
 ---
 
-## Quickstart — Mode B: Neo4j
+### Mode B — Neo4j
 
-Use this mode if you want a real graph database backend, or when working with actual JIRA data exports.
+**1. Install [Neo4j Desktop](https://neo4j.com/download)** → Create a project → Start a database → Note your password
 
-### 1. Install Neo4j Desktop
-Download and install from [neo4j.com/download](https://neo4j.com/download).
-- Open Neo4j Desktop → Create a new Project → Add a Database → Start it
-- Set a password when prompted (you'll use this in `.env`)
-
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Create your `.env` file
+**2. Create `.env`**
 ```env
 USE_NEO4J=true
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_neo4j_password_here
+NEO4J_PASSWORD=your_password_here
 MONITOR_INTERVAL=60
 
-# Optional — add for LLM explanations
 # GROQ_API_KEY=your_groq_key_here
 ```
 
-### 4. Generate synthetic data and load into Neo4j
+**3. Load data into Neo4j**
 ```bash
-# First generate the CSV data
 python preprocess.py --synthetic
-
-# Then load it into Neo4j (creates Issue nodes + DEPENDS_ON relationships)
 python build_graph.py
 ```
 
-### 5. Start the API server
+**4. Start the server**
 ```bash
 uvicorn main:app --reload --port 8000
 ```
-Expected output:
-```
-✓ Connected to Neo4j
-IssueGraphAgent++ ready  [mode: neo4j]
-```
 
-> **Note:** If Neo4j is not reachable at startup, the server automatically falls back to CSV mode with a warning. This means the server will never crash due to a database connection issue.
-
-### 6. Open the dashboard
-Open `issuegraph_ui.html` in your browser and enter `http://localhost:8000` as the API URL.
+> If Neo4j is unreachable at startup, the server automatically falls back to CSV mode — it will never crash due to a DB connection issue.
 
 ---
 
-## Switching Between Modes
+## 📡 API Reference
 
-Switching is a one-line change in `.env`:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Server status and active backend mode |
+| `GET` | `/dashboard` | Full risk dashboard — top risks, action plan, alerts |
+| `GET` | `/risk/{issue_id}` | Risk score + explanation for a single issue |
+| `GET` | `/graph/{issue_id}` | Dependency chain as nodes + edges |
+| `GET` | `/alerts` | Proactive monitoring alerts from background watcher |
+| `POST` | `/query` | Natural language query to the AI agent pipeline |
+| `POST` | `/counterfactual/{issue_id}` | **What-If simulation** — before/after risk diff |
+| `GET` | `/predictive-analysis` | ML-based risk prediction across the graph |
+| `POST` | `/train-predictive-model` | (Re)train the predictive model on current data |
+| `GET` | `/predictive-model-info` | Model metadata and feature importances |
 
-```env
-# CSV mode (no Neo4j)
-USE_NEO4J=false
+Interactive Swagger docs: **[http://localhost:8000/docs](http://localhost:8000/docs)**
 
-# Neo4j mode
-USE_NEO4J=true
+### Example: Query the AI agent
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "which blocked tasks are causing the most downstream risk?"}'
 ```
 
-All agents, the risk engine, and the What-If counterfactual feature work **identically in both modes**. The only difference is where the graph data comes from.
-
----
-
-## API Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/health` | Server status and active DB mode |
-| GET | `/dashboard` | Full dashboard: summary + top risks + action plan |
-| GET | `/risk/{issue_id}` | Risk score + explanation for one issue |
-| GET | `/graph/{issue_id}` | Dependency chain as nodes + edges |
-| GET | `/alerts` | Proactive monitoring alerts |
-| POST | `/query` | Natural language query to AI agent |
-| POST | `/counterfactual/{issue_id}` | **What-If simulation** — before/after risk diff |
-
-Interactive API docs (Swagger UI) available at:
-```
-http://localhost:8000/docs
-```
-
-### Counterfactual endpoint example
+### Example: What-If simulation
 ```bash
 curl -X POST http://localhost:8000/counterfactual/HADOOP-121 \
   -H "Content-Type: application/json" \
   -d '{"resolve_as": "Done"}'
 ```
 
-Response includes:
-- `impact_summary` — nodes improved, high-risk reduction, estimated delay-days saved
-- `diff[]` — per-node before/after risk scores sorted by most improved
-- `graph_nodes[]` + `graph_edges[]` — full graph state for visual rendering
-
----
-
-## What-If Analysis (Counterfactual Reasoning)
-
-This is the novel research contribution of this project. To use it:
-
-1. Open the dashboard and click **What-If** in the left sidebar
-2. Type any issue ID (e.g. `HADOOP-121`, `KAFKA-23`, `HADOOP-16`)
-3. Click **Run Simulation** or press Enter
-
-The system will:
-- Clone the current dependency graph entirely in memory (zero DB writes)
-- Mark the selected issue as resolved (Done, delay = 0)
-- Rerun the full temporal risk propagation algorithm on the clone
-- Display a **side-by-side graph diff** (BEFORE / AFTER) with colour-coded nodes
-- Show impact cards: nodes improved, high-risk reduction, delay-days saved
-- List every node whose risk score changed, sorted by biggest improvement
-
-**Why it's novel:** Counterfactual reasoning has not previously been applied to software project dependency graphs. The simulation uses the same temporal decay formula as the live engine, making the estimates principled rather than heuristic. This is formally equivalent to interventional reasoning in causal inference literature.
-
-**Good issues to test with synthetic data:**
-- `HADOOP-121` — direct blocker of the KAFKA-23 chain
-- `HADOOP-16` — blocked, cascades into 7+ high-risk downstream nodes
-- `KAFKA-33` — blocked, feeds SPARK-34 → SPARK-35 → HADOOP-36 chain
-- `KAFKA-23` — high centrality node; resolving it affects a large portion of the graph
-
----
-
-## Optional: LLM Explanations
-
-Add a Groq API key to `.env` to enable natural language explanations:
-
-```env
-GROQ_API_KEY=your_groq_key_here
+```json
+{
+  "impact_summary": {
+    "nodes_improved": 7,
+    "high_risk_reduction": 3,
+    "estimated_delay_days_saved": 42
+  },
+  "diff": [
+    { "issue_id": "KAFKA-23", "before": 0.87, "after": 0.21, "delta": -0.66 },
+    { "issue_id": "SPARK-34", "before": 0.74, "after": 0.18, "delta": -0.56 }
+  ]
+}
 ```
 
-This powers:
-- The **LLM Analysis** panel in the dashboard (root cause summary + recommendations)
-- The **AI Agent chat** (ask natural language questions about your project)
+---
 
-The risk engine, What-If feature, and all other functionality work fully without it.
+## 🔮 What-If Counterfactual Analysis
 
-Get a free Groq API key at [console.groq.com](https://console.groq.com).
+This is the **novel research contribution** of the project.
+
+Open the dashboard → click **What-If** in the sidebar → enter any issue ID → click **Run Simulation**.
+
+**What happens under the hood:**
+
+1. The entire dependency graph is cloned in memory — zero database writes
+2. The selected issue is marked as `Done` (delay = 0)
+3. The full temporal risk propagation algorithm reruns on the clone
+4. A side-by-side graph diff is returned: colour-coded BEFORE / AFTER nodes
+5. Impact cards show: nodes improved, high-risk reductions, total delay-days saved
+
+**Why it matters:** Counterfactual reasoning has not previously been applied to software project dependency graphs. The simulation uses the same temporal decay formula as the live engine, making estimates principled rather than heuristic — formally equivalent to interventional reasoning in causal inference.
+
+**Good issues to try:**
+
+| Issue ID | Why it's interesting |
+|----------|---------------------|
+| `HADOOP-121` | Direct blocker of the KAFKA-23 chain |
+| `HADOOP-16` | Cascades into 7+ high-risk downstream nodes |
+| `KAFKA-33` | Feeds SPARK-34 → SPARK-35 → HADOOP-36 |
+| `KAFKA-23` | High-centrality node affecting a large graph portion |
 
 ---
+
+## 🔍 Semantic RAG Retrieval
+
+The `get_relevant_context()` method uses **real vector-based retrieval** — not keyword matching.
+
+### How it works
+
+Each issue is embedded as a rich document string:
+```
+HADOOP-121: MapReduce job is overdue and blocking release.
+Status: Blocked. Priority: Critical.
+This issue is overdue and behind schedule by 14 days. It is delayed and late.
+This issue is blocked and cannot proceed. It is a blocker.
+Risk score: 0.87 (High risk).
+```
+
+At query time, the query is embedded using the same model and cosine similarity retrieves the top-k semantically closest issues.
+
+### Query-aware re-ranking
+
+For risk-oriented queries, retrieval uses a hybrid score:
+
+```
+final_score = semantic_similarity × 0.7 + risk_boost × 0.3
+```
+
+For neutral queries, pure semantic similarity is used (risk boost = 0).
+
+### Why this beats keyword matching
+
+| Query | Keyword matching | Semantic RAG |
+|-------|-----------------|--------------|
+| `"tasks behind schedule"` | Only matches literal "behind" or "schedule" | ✅ Matches "overdue", "delayed", "late", "blocked" |
+| `"blocked critical issues"` | Only matches "blocked" and "critical" | ✅ Surfaces Blocked+Critical issues by meaning |
+| `"routine low priority tasks"` | May return nothing | ✅ Correctly surfaces Open+Low priority issues |
+
+### Verified test results
+
+```
+✅ Test 1 — "tasks behind schedule"   → HADOOP-5, HADOOP-1, HADOOP-3  (all at-risk)
+✅ Test 2 — "blocked critical issues" → HADOOP-5, HADOOP-1             (both Blocked)
+✅ Test 3 — "routine low priority"    → HADOOP-2, HADOOP-4             (both low-risk)
+```
+
+---
+
+## 🧪 Running the RAG Test
+
+```bash
+python test_rag.py
+```
+
+Expected output:
+```
+RAG available: True
+--- Test 1: 'tasks behind schedule' ---
+  #1: HADOOP-5 | at_risk=True | Deployment blocked, release deadline missed by 3 weeks
+  #2: HADOOP-1 | at_risk=True | MapReduce job is overdue and blocking release
+  #3: HADOOP-3 | at_risk=True | Unit tests failing on CI pipeline, build is late
+PASS
+--- Test 2: 'blocked critical issues' ---
+  #1: HADOOP-5 | status=Blocked | ...
+  #2: HADOOP-1 | status=Blocked | ...
+PASS
+--- Test 3: 'routine low priority tasks' ---
+  #1: HADOOP-2 | priority=Low | Documentation update
+PASS
+```
+
+---
+
+## 🤖 The 6-Agent Pipeline
+
+```
+User Query
+    │
+    ▼
+PerceptionAgent        — Ingests graph state (nodes + edges) from CSV or Neo4j
+    │
+    ▼
+GraphReasoningAgent    — Runs temporal risk propagation; computes R(v) for all nodes
+    │
+    ▼
+RAGRetriever           — Semantic vector search; filters context to top-k relevant issues
+    │
+    ▼
+PlanningAgent          — Decomposes mitigation goal into ranked sub-tasks
+    │
+    ▼
+DecisionAgent          — LLaMA 3.3 70B via Groq; generates explanation + recommendations
+    │
+    ▼
+CriticAgent            — Validates LLM output; strips hallucinated issue IDs
+    │
+    ▼
+Response
+```
+
+**MonitoringAgent** runs independently as a background thread, polling for state changes and emitting proactive alerts when risk spikes.
+
+---
+
+## ⚙️ Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `USE_NEO4J` | `false` | Set `true` to use Neo4j backend |
+| `NEO4J_URI` | `bolt://localhost:7687` | Neo4j connection URI |
+| `NEO4J_USER` | `neo4j` | Neo4j username |
+| `NEO4J_PASSWORD` | *(required if Neo4j)* | Neo4j password |
+| `GROQ_API_KEY` | *(optional)* | Enables LLM explanations and AI chat |
+| `MONITOR_INTERVAL` | `60` | MonitoringAgent poll interval in seconds |
+
+---
+
+## 🧠 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| API | FastAPI + Uvicorn |
+| Graph DB | Neo4j 5 / in-memory CSV |
+| Vector Store | ChromaDB (in-memory, cosine similarity) |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| LLM | Groq — LLaMA 3.3 70B |
+| ML Prediction | scikit-learn |
+| Frontend | Vanilla HTML/CSS/JS (zero build step) |
+| Data | Apache Hadoop JIRA export (12,740 real issues) |
+
+---
+
+## 📊 Dataset
+
+Two datasets are included:
+
+**Synthetic** (`data/processed/`) — 300 issues, 124 dependencies. Generated by `preprocess.py`. Good for quick demos and development.
+
+**Real Hadoop** (`data/real_hadoop/`) — 12,740 real Apache Hadoop JIRA issues with authentic dependency chains, priority distributions, and delay patterns. Switch to it by updating the data path in `.env`.
+
+---
+
+<div align="center">
+
+Built as part of **IssueGraphAgent++** — a research project on proactive AI-driven software risk intelligence.
+
+*Amrita Vishwa Vidyapeetham, School of Computing — Group 7*
+
+</div>
