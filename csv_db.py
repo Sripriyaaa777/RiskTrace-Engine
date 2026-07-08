@@ -172,15 +172,25 @@ class CsvGraphDB:
             return _ResultSet(rows)
 
         # Pattern: blocked/delayed issues with dependents (for CypherBaseline)
+                # Pattern: downstream dependents of one delayed issue (benchmark generation)
+        if "return distinct dependent.issue_id as dep_id" in q:
+            issue_id = params.get("id", "")
+            dependents = [
+                src
+                for src, tgt, _ in self._deps
+                if tgt == issue_id
+            ]
+            return _ResultSet([{"dep_id": d} for d in dependents])
+
+        # Pattern: blocked/delayed issues with dependents (for CypherBaseline)
         if "is_delayed = true" in q:
             delayed_ids = {iid for iid, v in self._issues.items() if v["is_delayed"]}
-            # find immediate dependents
             dependent_ids = {
                 src for src, tgt, _ in self._deps if tgt in delayed_ids
             }
             all_ids = list(delayed_ids | dependent_ids)[:params.get("k", 10)]
             return _ResultSet([{"id": iid} for iid in all_ids])
-
+        
         # Pattern: status distribution (for validate)
         if "return n.status as status, count" in q:
             from collections import Counter
