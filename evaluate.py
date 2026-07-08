@@ -206,8 +206,14 @@ class OurSystemAdapter:
             ids = [r["issue_id"] for r in result["top_risks"][:top_k]]
         elif "issue_id" in result:
             ids = [result["issue_id"]]
-            # Include affected_by for chain queries
-            ids += result.get("affected_by", [])
+            # The benchmark's expected_ids = [origin] + downstream dependents
+            # (see generate_benchmark_from_graph), so predictions must match
+            # that direction. affected_by is upstream ancestry — wrong axis —
+            # so we use the reasoning agent's downstream_impact instead.
+            try:
+                ids += self.pipeline.reasoning.downstream_impact(result["issue_id"])
+            except Exception:
+                ids += result.get("affected_by", [])
             ids = ids[:top_k]
         else:
             ids = []
@@ -231,22 +237,32 @@ def generate_benchmark_from_graph(db, n_queries: int = 60) -> list[dict]:
     import random
     random.seed(2024)
 
-    # Fetch delayed issues
-    delayed_query = """
-    MATCH (n:Issue)
-    WHERE n.is_delayed = true
-    RETURN n.issue_id AS id, n.delay_days AS delay_days
-    ORDER BY n.delay_days DESC
-    LIMIT 20
-    """
-    delayed = [{"id": r["id"], "delay_days": r["delay_days"]}
-               for r in db.run(delayed_query)]
+    # Fetch delayed issues directly from parsed nodes (a hand-written Cypher
+    # string here was silently mis-parsed by the CSV backend — it returned
+    # ALL open issues rather than filtering+sorting by is_delayed/delay_days)
+    from agents import PerceptionAgent as _PerceptionAgent
+    _perception_seed = _PerceptionAgent(db)
+    all_nodes = _perception_seed.fetch_all_nodes()
+    delayed_nodes = sorted(
+        (n for n in all_nodes if n.is_delayed),
+        key=lambda n: (n.delay_days or 0),
+        reverse=True,
+    )[:20]
+    delayed = [{"id": n.issue_id, "delay_days": n.delay_days} for n in delayed_nodes]
 
     if not delayed:
         log.warning("No delayed issues found for benchmark generation.")
         return []
 
     # For each delayed issue, find its downstream dependents
+    # (using the same reasoning-agent method the live system uses for
+    # predictions, so ground truth and predictions are defined identically —
+    # a hand-written Cypher string here was silently mis-parsed by the CSV
+    # backend and ignored the specific issue id, contaminating ground truth)
+    from agents import PerceptionAgent, GraphReasoningAgent
+    _perception = PerceptionAgent(db)
+    _reasoning  = GraphReasoningAgent(_perception)
+
     benchmark = []
     q_id = 1
 
@@ -276,13 +292,8 @@ def generate_benchmark_from_graph(db, n_queries: int = 60) -> list[dict]:
     for delayed_issue in delayed[:min(len(delayed), n_queries // 4)]:
         issue_id = delayed_issue["id"]
 
-        # Find downstream dependents
-        dep_query = """
-        MATCH path = (dependent:Issue)-[:DEPENDS_ON*1..5]->(origin:Issue {issue_id: $id})
-        WHERE origin.is_delayed = true
-        RETURN DISTINCT dependent.issue_id AS dep_id
-        """
-        dependents = [r["dep_id"] for r in db.run(dep_query, {"id": issue_id})]
+        # Find downstream dependents directly via the reasoning agent
+        dependents = _reasoning.downstream_impact(issue_id)
         expected_ids = [issue_id] + dependents
 
         for task_type, templates in query_templates.items():
@@ -435,16 +446,27 @@ def main():
     parser.add_argument("--n-queries", type=int, default=60)
     args = parser.parse_args()
 
-    # Connect
-    from build_graph import GraphDB
+    # Connect — CSV mode by default (set USE_NEO4J=true in .env to use Neo4j instead)
     from agents import AgentPipeline
 
-    db = GraphDB(
-        uri      = os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-        user     = os.getenv("NEO4J_USER", "neo4j"),
-        password = os.getenv("NEO4J_PASSWORD", "issuegraph123"),
-    )
-    pipeline = AgentPipeline(db, openai_api_key=os.getenv("OPENAI_API_KEY", ""))
+    use_neo4j = os.getenv("USE_NEO4J", "false").lower() == "true"
+    if use_neo4j:
+        from build_graph import GraphDB
+        db = GraphDB(
+            uri      = os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            user     = os.getenv("NEO4J_USER", "neo4j"),
+            password = os.getenv("NEO4J_PASSWORD", "issuegraph123"),
+        )
+        log.info("Connected to Neo4j")
+    else:
+        from csv_db import CsvGraphDB
+        db = CsvGraphDB(
+            issues_path = os.getenv("ISSUES_CSV", "data/processed/issues.csv"),
+            deps_path   = os.getenv("DEPS_CSV",   "data/processed/dependencies.csv"),
+        )
+        log.info("Running in CSV mode")
+
+    pipeline = AgentPipeline(db, openai_api_key=os.getenv("GROQ_API_KEY", ""))
 
     # Load / generate benchmark
     if args.benchmark and args.benchmark.exists():
