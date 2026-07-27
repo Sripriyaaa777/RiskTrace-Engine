@@ -603,14 +603,19 @@
 // ── State ──
 const REAL_API_BASE = 'http://127.0.0.1:8004';
 const SYNTHETIC_API_BASE = 'http://127.0.0.1:8005';
-const DEFAULT_API_BASE = REAL_API_BASE;
+const IS_LOCAL_HOST = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
+const DEFAULT_API_BASE = IS_LOCAL_HOST ? REAL_API_BASE : window.location.origin;
 const LEGACY_API_BASES = new Set([
   'http://localhost:8000',
   'http://127.0.0.1:8000',
   'http://localhost:8001',
   'http://127.0.0.1:8001',
   'http://localhost:8002',
-  'http://127.0.0.1:8002'
+  'http://127.0.0.1:8002',
+  'http://localhost:8004',
+  'http://127.0.0.1:8004',
+  'http://localhost:8005',
+  'http://127.0.0.1:8005'
 ]);
 
 function getInitialApiBase() {
@@ -622,7 +627,7 @@ function getInitialApiBase() {
   }
   const saved = (localStorage.getItem('igraph_api') || '').replace(/\/$/, '');
   if (!saved) return DEFAULT_API_BASE;
-  if (LEGACY_API_BASES.has(saved)) {
+  if (!IS_LOCAL_HOST && LEGACY_API_BASES.has(saved)) {
     localStorage.setItem('igraph_api', DEFAULT_API_BASE);
     return DEFAULT_API_BASE;
   }

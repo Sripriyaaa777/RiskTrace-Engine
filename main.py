@@ -27,6 +27,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -129,6 +130,21 @@ def require_pipeline():
             "Pipeline not ready. Run: python preprocess.py --synthetic"
         )
     return _pipeline
+
+
+@app.get("/", include_in_schema=False)
+def dashboard_home():
+    return FileResponse(Path(__file__).parent / "issuegraph_ui.html")
+
+
+@app.get("/issuegraph_ui.html", include_in_schema=False)
+def dashboard_html():
+    return FileResponse(Path(__file__).parent / "issuegraph_ui.html")
+
+
+@app.get("/risktrace_block_diagram.png", include_in_schema=False)
+def architecture_image():
+    return FileResponse(Path(__file__).parent / "risktrace_block_diagram.png")
 
 
 @app.get("/health", tags=["system"])
