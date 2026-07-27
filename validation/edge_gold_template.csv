@@ -1,0 +1,101 @@
+source,target,label,notes
+HADOOP-16572,HADOOP-17067,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17608,HADOOP-17140,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17768,HADOOP-17160,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16375,HADOOP-16436,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17294,HADOOP-16978,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17348,HADOOP-17160,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17389,HADOOP-17360,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17557,HADOOP-17297,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16385,HADOOP-17143,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17624,HADOOP-17055,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16499,HADOOP-16969,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16376,HADOOP-16910,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16762,HADOOP-16913,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17654,HADOOP-16368,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16662,HADOOP-16309,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17001,HADOOP-17486,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17755,HADOOP-17241,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17760,HADOOP-16656,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17642,HADOOP-17260,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17399,HADOOP-17196,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17371,HADOOP-17633,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16840,HADOOP-16967,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16645,HADOOP-16658,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17766,HADOOP-17816,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16729,HADOOP-16772,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17438,HADOOP-17009,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16421,HADOOP-17087,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16554,HADOOP-17427,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16446,HADOOP-16588,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16762,HADOOP-16910,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17006,HADOOP-17423,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17396,HADOOP-17365,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16944,HADOOP-17297,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16667,HADOOP-17232,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17286,HADOOP-16331,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16241,HADOOP-17764,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17805,HADOOP-16954,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16344,HADOOP-16249,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16249,HADOOP-16344,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17517,HADOOP-17096,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16453,HADOOP-16431,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17000,HADOOP-16334,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17157,HADOOP-16255,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17287,HADOOP-16386,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17522,HADOOP-17307,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17404,HADOOP-16818,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-16334,HADOOP-17297,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17163,HADOOP-17473,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17625,HADOOP-17627,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17644,HADOOP-16753,1,heuristic positive: inferred edge with confidence >= 0.75 and same Hadoop sub-project
+HADOOP-17127,HADOOP-16912,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17643,HADOOP-16257,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17194,HADOOP-16965,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16229,HADOOP-16787,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17217,HADOOP-16423,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16673,HADOOP-17134,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17355,HADOOP-16993,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16300,HADOOP-17392,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17760,HADOOP-16886,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16452,HADOOP-16504,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16947,HADOOP-16714,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16816,HADOOP-17399,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17585,HADOOP-16659,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17128,HADOOP-16336,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17677,HADOOP-16792,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16782,HADOOP-17360,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17293,HADOOP-17682,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16259,HADOOP-17549,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16634,HADOOP-17409,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16644,HADOOP-16967,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16197,HADOOP-16470,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17191,HADOOP-16710,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16727,HADOOP-16958,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17475,HADOOP-17183,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16483,HADOOP-16426,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17682,HADOOP-17610,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17740,HADOOP-17379,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16570,HADOOP-16618,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17414,HADOOP-17584,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16350,HADOOP-17042,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17308,HADOOP-16998,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17676,HADOOP-16389,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16203,HADOOP-17150,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17407,HADOOP-16617,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16192,HADOOP-17502,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17638,HADOOP-17527,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17323,HADOOP-17271,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16956,HADOOP-17064,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16618,HADOOP-16721,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16249,HADOOP-16331,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17189,HADOOP-16250,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17527,HADOOP-17638,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17161,HADOOP-16868,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17197,HADOOP-17343,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17449,HADOOP-17441,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16551,HADOOP-16606,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-17354,HADOOP-17024,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16490,HADOOP-16711,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16529,HADOOP-16832,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support
+HADOOP-16590,HADOOP-16262,0,heuristic negative: inferred edge lacks high confidence and/or same-sub-project support

@@ -1,0 +1,125 @@
+source,target,link_type,direction
+KAFKA-2,KAFKA-1,blocks,outward
+KAFKA-3,KAFKA-2,blocks,outward
+SPARK-4,KAFKA-3,blocks,outward
+SPARK-5,SPARK-4,blocks,outward
+SPARK-6,SPARK-5,blocks,outward
+SPARK-7,SPARK-6,blocks,outward
+HADOOP-8,SPARK-7,blocks,outward
+SPARK-9,HADOOP-8,blocks,outward
+SPARK-10,SPARK-9,blocks,outward
+SPARK-11,SPARK-10,blocks,outward
+SPARK-12,SPARK-11,blocks,outward
+SPARK-13,SPARK-12,blocks,outward
+SPARK-14,SPARK-13,blocks,outward
+KAFKA-15,SPARK-14,blocks,outward
+HADOOP-16,KAFKA-15,blocks,outward
+KAFKA-17,HADOOP-16,blocks,outward
+SPARK-18,KAFKA-17,blocks,outward
+KAFKA-19,SPARK-18,blocks,outward
+HADOOP-20,KAFKA-19,blocks,outward
+HADOOP-21,HADOOP-20,blocks,outward
+HADOOP-22,HADOOP-21,blocks,outward
+KAFKA-23,HADOOP-22,blocks,outward
+KAFKA-24,KAFKA-23,blocks,outward
+KAFKA-25,KAFKA-24,blocks,outward
+KAFKA-26,KAFKA-25,blocks,outward
+HADOOP-27,KAFKA-26,blocks,outward
+SPARK-28,HADOOP-27,blocks,outward
+KAFKA-29,SPARK-28,blocks,outward
+SPARK-30,KAFKA-29,blocks,outward
+KAFKA-31,SPARK-30,blocks,outward
+SPARK-32,KAFKA-31,blocks,outward
+KAFKA-33,SPARK-32,blocks,outward
+SPARK-34,KAFKA-33,blocks,outward
+SPARK-35,SPARK-34,blocks,outward
+HADOOP-36,SPARK-35,blocks,outward
+SPARK-37,HADOOP-36,blocks,outward
+HADOOP-38,SPARK-37,blocks,outward
+KAFKA-39,HADOOP-38,blocks,outward
+SPARK-40,KAFKA-39,blocks,outward
+KAFKA-25,SPARK-9,blocks,outward
+KAFKA-25,SPARK-125,blocks,outward
+KAFKA-25,KAFKA-107,blocks,outward
+KAFKA-25,HADOOP-36,blocks,outward
+KAFKA-25,HADOOP-53,blocks,outward
+KAFKA-15,KAFKA-230,blocks,outward
+KAFKA-15,KAFKA-26,blocks,outward
+HADOOP-16,KAFKA-24,blocks,outward
+HADOOP-16,KAFKA-207,blocks,outward
+HADOOP-16,SPARK-226,blocks,outward
+SPARK-30,HADOOP-278,blocks,outward
+SPARK-30,KAFKA-113,blocks,outward
+KAFKA-23,HADOOP-259,blocks,outward
+KAFKA-23,KAFKA-150,blocks,outward
+KAFKA-23,HADOOP-121,blocks,outward
+SPARK-10,SPARK-297,blocks,outward
+SPARK-10,SPARK-166,blocks,outward
+SPARK-10,SPARK-123,blocks,outward
+SPARK-10,SPARK-156,blocks,outward
+SPARK-18,KAFKA-268,blocks,outward
+SPARK-18,SPARK-115,blocks,outward
+SPARK-18,SPARK-213,blocks,outward
+SPARK-13,HADOOP-142,blocks,outward
+SPARK-13,KAFKA-33,blocks,outward
+SPARK-13,KAFKA-287,blocks,outward
+SPARK-13,SPARK-91,blocks,outward
+HADOOP-8,SPARK-286,blocks,outward
+HADOOP-8,HADOOP-255,blocks,outward
+HADOOP-8,KAFKA-26,blocks,outward
+HADOOP-8,HADOOP-178,blocks,outward
+HADOOP-8,KAFKA-197,blocks,outward
+KAFKA-3,SPARK-215,blocks,outward
+KAFKA-3,HADOOP-211,blocks,outward
+KAFKA-3,HADOOP-78,blocks,outward
+KAFKA-3,SPARK-155,blocks,outward
+KAFKA-193,KAFKA-95,depends on,outward
+KAFKA-276,HADOOP-243,depends on,outward
+SPARK-124,SPARK-116,depends on,outward
+SPARK-154,KAFKA-74,depends on,outward
+HADOOP-238,SPARK-30,depends on,outward
+KAFKA-288,HADOOP-212,depends on,outward
+HADOOP-214,SPARK-286,depends on,outward
+KAFKA-272,KAFKA-69,depends on,outward
+KAFKA-199,SPARK-125,depends on,outward
+KAFKA-131,KAFKA-105,depends on,outward
+SPARK-170,KAFKA-41,depends on,outward
+HADOOP-231,HADOOP-190,depends on,outward
+KAFKA-48,KAFKA-275,depends on,outward
+KAFKA-98,HADOOP-27,depends on,outward
+KAFKA-138,KAFKA-194,depends on,outward
+HADOOP-21,HADOOP-38,depends on,outward
+KAFKA-97,KAFKA-287,depends on,outward
+KAFKA-112,KAFKA-246,depends on,outward
+KAFKA-107,HADOOP-171,depends on,outward
+SPARK-156,HADOOP-8,depends on,outward
+KAFKA-109,KAFKA-98,depends on,outward
+KAFKA-61,KAFKA-246,depends on,outward
+SPARK-125,KAFKA-105,depends on,outward
+KAFKA-204,SPARK-123,depends on,outward
+SPARK-283,KAFKA-165,depends on,outward
+HADOOP-145,SPARK-195,depends on,outward
+KAFKA-239,HADOOP-274,depends on,outward
+KAFKA-184,HADOOP-158,depends on,outward
+HADOOP-134,HADOOP-185,depends on,outward
+KAFKA-263,HADOOP-255,depends on,outward
+KAFKA-239,HADOOP-51,depends on,outward
+SPARK-241,KAFKA-164,depends on,outward
+KAFKA-105,HADOOP-190,depends on,outward
+KAFKA-161,HADOOP-212,depends on,outward
+KAFKA-24,KAFKA-289,depends on,outward
+HADOOP-114,KAFKA-75,depends on,outward
+SPARK-9,HADOOP-134,depends on,outward
+KAFKA-284,HADOOP-300,depends on,outward
+SPARK-297,HADOOP-214,depends on,outward
+SPARK-152,KAFKA-79,depends on,outward
+HADOOP-101,HADOOP-169,depends on,outward
+KAFKA-118,SPARK-195,depends on,outward
+KAFKA-292,SPARK-126,depends on,outward
+HADOOP-256,HADOOP-282,depends on,outward
+KAFKA-173,KAFKA-132,depends on,outward
+SPARK-251,HADOOP-252,depends on,outward
+HADOOP-236,KAFKA-87,depends on,outward
+SPARK-181,KAFKA-87,depends on,outward
+HADOOP-72,SPARK-280,depends on,outward
+SPARK-251,KAFKA-95,depends on,outward

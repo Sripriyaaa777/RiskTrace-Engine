@@ -1,0 +1,3737 @@
+{
+  "summary": {
+    "ours/risk_identification": {
+      "precision": 0.889,
+      "recall": 0.736,
+      "f1": 0.747,
+      "mrr": 1.0,
+      "latency": 1.925,
+      "bleu": 0.305,
+      "root_cause_acc": 0.667
+    },
+    "keyword/risk_identification": {
+      "precision": 0.625,
+      "recall": 0.472,
+      "f1": 0.444,
+      "mrr": 1.0,
+      "latency": 0.0
+    },
+    "cypher/risk_identification": {
+      "precision": 0.008,
+      "recall": 0.042,
+      "f1": 0.014,
+      "mrr": 0.042,
+      "latency": 0.0
+    },
+    "ours/root_cause_analysis": {
+      "precision": 0.889,
+      "recall": 0.736,
+      "f1": 0.747,
+      "mrr": 1.0,
+      "latency": 1.324,
+      "bleu": 0.303,
+      "root_cause_acc": 0.583
+    },
+    "keyword/root_cause_analysis": {
+      "precision": 1.0,
+      "recall": 0.472,
+      "f1": 0.639,
+      "mrr": 1.0,
+      "latency": 0.003
+    },
+    "cypher/root_cause_analysis": {
+      "precision": 0.008,
+      "recall": 0.042,
+      "f1": 0.014,
+      "mrr": 0.042,
+      "latency": 0.0
+    },
+    "ours/blocking_detection": {
+      "precision": 0.889,
+      "recall": 0.736,
+      "f1": 0.747,
+      "mrr": 1.0,
+      "latency": 1.584,
+      "bleu": 0.276,
+      "root_cause_acc": 0.583
+    },
+    "keyword/blocking_detection": {
+      "precision": 1.0,
+      "recall": 0.472,
+      "f1": 0.639,
+      "mrr": 1.0,
+      "latency": 0.002
+    },
+    "cypher/blocking_detection": {
+      "precision": 0.008,
+      "recall": 0.042,
+      "f1": 0.014,
+      "mrr": 0.042,
+      "latency": 0.0
+    },
+    "ours/delay_explanation": {
+      "precision": 0.889,
+      "recall": 0.736,
+      "f1": 0.747,
+      "mrr": 1.0,
+      "latency": 1.73,
+      "bleu": 0.318,
+      "root_cause_acc": 0.583
+    },
+    "keyword/delay_explanation": {
+      "precision": 0.642,
+      "recall": 0.542,
+      "f1": 0.47,
+      "mrr": 1.0,
+      "latency": 0.001
+    },
+    "cypher/delay_explanation": {
+      "precision": 0.008,
+      "recall": 0.042,
+      "f1": 0.014,
+      "mrr": 0.042,
+      "latency": 0.0
+    },
+    "ours/OVERALL": {
+      "precision": 0.889,
+      "recall": 0.736,
+      "f1": 0.747,
+      "mrr": 1.0,
+      "latency": 1.641
+    },
+    "keyword/OVERALL": {
+      "precision": 0.817,
+      "recall": 0.49,
+      "f1": 0.548,
+      "mrr": 1.0,
+      "latency": 0.002
+    },
+    "cypher/OVERALL": {
+      "precision": 0.008,
+      "recall": 0.042,
+      "f1": 0.014,
+      "mrr": 0.042,
+      "latency": 0.0
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "Q001",
+      "query_type": "risk_identification",
+      "query": "What will be affected if KAFKA-1 is not resolved?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.016,
+      "explanation_bleu": 0.0
+    },
+    {
+      "query_id": "Q001",
+      "query_type": "risk_identification",
+      "query": "What will be affected if KAFKA-1 is not resolved?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q001",
+      "query_type": "risk_identification",
+      "query": "What will be affected if KAFKA-1 is not resolved?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q002",
+      "query_type": "root_cause_analysis",
+      "query": "Why is there a delay originating from KAFKA-1?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.032,
+      "explanation_bleu": 0.0
+    },
+    {
+      "query_id": "Q002",
+      "query_type": "root_cause_analysis",
+      "query": "Why is there a delay originating from KAFKA-1?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q002",
+      "query_type": "root_cause_analysis",
+      "query": "Why is there a delay originating from KAFKA-1?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q003",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of KAFKA-1",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.033,
+      "explanation_bleu": 0.0
+    },
+    {
+      "query_id": "Q003",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of KAFKA-1",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q003",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of KAFKA-1",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q004",
+      "query_type": "delay_explanation",
+      "query": "What caused KAFKA-1 to fall behind schedule?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.025,
+      "explanation_bleu": 0.0
+    },
+    {
+      "query_id": "Q004",
+      "query_type": "delay_explanation",
+      "query": "What caused KAFKA-1 to fall behind schedule?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-1"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q004",
+      "query_type": "delay_explanation",
+      "query": "What caused KAFKA-1 to fall behind schedule?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-1",
+        "KAFKA-2"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q005",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-5 is not resolved?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 1.566,
+      "explanation_bleu": 0.182
+    },
+    {
+      "query_id": "Q005",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-5 is not resolved?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q005",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-5 is not resolved?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q006",
+      "query_type": "root_cause_analysis",
+      "query": "Why is there a delay originating from SPARK-5?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.809,
+      "explanation_bleu": 0.3
+    },
+    {
+      "query_id": "Q006",
+      "query_type": "root_cause_analysis",
+      "query": "Why is there a delay originating from SPARK-5?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.014,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q006",
+      "query_type": "root_cause_analysis",
+      "query": "Why is there a delay originating from SPARK-5?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q007",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-5",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.857,
+      "explanation_bleu": 0.182
+    },
+    {
+      "query_id": "Q007",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-5",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q007",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-5",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q008",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in SPARK-5",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-5"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.959,
+      "explanation_bleu": 0.286
+    },
+    {
+      "query_id": "Q008",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in SPARK-5",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-5",
+        "SPARK-9",
+        "SPARK-11",
+        "SPARK-14",
+        "SPARK-18",
+        "KAFKA-19",
+        "HADOOP-21",
+        "KAFKA-24",
+        "KAFKA-26",
+        "SPARK-30"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.005,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q008",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in SPARK-5",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-5",
+        "SPARK-6"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q009",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by SPARK-7",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-7",
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.795,
+      "explanation_bleu": 0.4
+    },
+    {
+      "query_id": "Q009",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by SPARK-7",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-7",
+        "HADOOP-16",
+        "KAFKA-23",
+        "KAFKA-33",
+        "SPARK-35",
+        "KAFKA-48",
+        "HADOOP-51",
+        "HADOOP-59",
+        "KAFKA-61",
+        "KAFKA-69"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q009",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by SPARK-7",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q010",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-7?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-7",
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 1.04,
+      "explanation_bleu": 0.455
+    },
+    {
+      "query_id": "Q010",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-7?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-7"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.006,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q010",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-7?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q011",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-7",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-7",
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.764,
+      "explanation_bleu": 0.25
+    },
+    {
+      "query_id": "Q011",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-7",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-7"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.009,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q011",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-7",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q012",
+      "query_type": "delay_explanation",
+      "query": "Why is SPARK-7 delayed?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-7",
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.827,
+      "explanation_bleu": 0.429
+    },
+    {
+      "query_id": "Q012",
+      "query_type": "delay_explanation",
+      "query": "Why is SPARK-7 delayed?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-7"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q012",
+      "query_type": "delay_explanation",
+      "query": "Why is SPARK-7 delayed?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-7",
+        "HADOOP-8"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q013",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by HADOOP-8",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 1.045,
+      "explanation_bleu": 0.364
+    },
+    {
+      "query_id": "Q013",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by HADOOP-8",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-8",
+        "HADOOP-16",
+        "KAFKA-23",
+        "KAFKA-33",
+        "SPARK-35",
+        "KAFKA-48",
+        "HADOOP-51",
+        "HADOOP-59",
+        "KAFKA-61",
+        "KAFKA-69"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 0.1,
+      "recall": 0.333,
+      "f1": 0.154,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q013",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by HADOOP-8",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q014",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to HADOOP-8",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 0.711,
+      "explanation_bleu": 0.231
+    },
+    {
+      "query_id": "Q014",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to HADOOP-8",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-8"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q014",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to HADOOP-8",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q015",
+      "query_type": "blocking_detection",
+      "query": "What does HADOOP-8 block?",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 2.033,
+      "explanation_bleu": 0.375
+    },
+    {
+      "query_id": "Q015",
+      "query_type": "blocking_detection",
+      "query": "What does HADOOP-8 block?",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-8"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q015",
+      "query_type": "blocking_detection",
+      "query": "What does HADOOP-8 block?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q016",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in HADOOP-8",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-8",
+        "SPARK-156",
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": true,
+      "latency_secs": 4.181,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q016",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in HADOOP-8",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-11",
+        "SPARK-14",
+        "SPARK-18",
+        "KAFKA-19",
+        "HADOOP-21",
+        "KAFKA-24",
+        "KAFKA-26",
+        "SPARK-30"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 0.2,
+      "recall": 0.667,
+      "f1": 0.308,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q016",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in HADOOP-8",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-8",
+        "SPARK-9",
+        "SPARK-156"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q017",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-9 is not resolved?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 4.037,
+      "explanation_bleu": 0.308
+    },
+    {
+      "query_id": "Q017",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-9 is not resolved?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q017",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-9 is not resolved?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q018",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-9",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 2.828,
+      "explanation_bleu": 0.308
+    },
+    {
+      "query_id": "Q018",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-9",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.01,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q018",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-9",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q019",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-9",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.923,
+      "explanation_bleu": 0.308
+    },
+    {
+      "query_id": "Q019",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-9",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.001,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q019",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-9",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q020",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-9 to fall behind schedule?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.743,
+      "explanation_bleu": 0.364
+    },
+    {
+      "query_id": "Q020",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-9 to fall behind schedule?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-9"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q020",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-9 to fall behind schedule?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-9",
+        "SPARK-10",
+        "KAFKA-25"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q021",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because SPARK-11 is delayed?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.895,
+      "explanation_bleu": 0.364
+    },
+    {
+      "query_id": "Q021",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because SPARK-11 is delayed?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q021",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because SPARK-11 is delayed?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q022",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-11?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 2.77,
+      "explanation_bleu": 0.5
+    },
+    {
+      "query_id": "Q022",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-11?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.004,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q022",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-11?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q023",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-11",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.903,
+      "explanation_bleu": 0.273
+    },
+    {
+      "query_id": "Q023",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-11",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q023",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-11",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q024",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-11 to fall behind schedule?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.775,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q024",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-11 to fall behind schedule?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-11"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q024",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-11 to fall behind schedule?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-11",
+        "SPARK-12"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q025",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-13 is not resolved?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.073,
+      "explanation_bleu": 0.182
+    },
+    {
+      "query_id": "Q025",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-13 is not resolved?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-13"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q025",
+      "query_type": "risk_identification",
+      "query": "What will be affected if SPARK-13 is not resolved?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q026",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-13",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.992,
+      "explanation_bleu": 0.182
+    },
+    {
+      "query_id": "Q026",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-13",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-13"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q026",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-13",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q027",
+      "query_type": "blocking_detection",
+      "query": "Is SPARK-13 blocking any other tasks?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 2.968,
+      "explanation_bleu": 0.25
+    },
+    {
+      "query_id": "Q027",
+      "query_type": "blocking_detection",
+      "query": "Is SPARK-13 blocking any other tasks?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-13"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q027",
+      "query_type": "blocking_detection",
+      "query": "Is SPARK-13 blocking any other tasks?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q028",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-13 to fall behind schedule?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.872,
+      "explanation_bleu": 0.222
+    },
+    {
+      "query_id": "Q028",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-13 to fall behind schedule?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-13"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.007,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q028",
+      "query_type": "delay_explanation",
+      "query": "What caused SPARK-13 to fall behind schedule?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-13",
+        "SPARK-14"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q029",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because SPARK-14 is delayed?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 4.209,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q029",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because SPARK-14 is delayed?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.001,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q029",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because SPARK-14 is delayed?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q030",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-14",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 2.807,
+      "explanation_bleu": 0.25
+    },
+    {
+      "query_id": "Q030",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-14",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q030",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to SPARK-14",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q031",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-14",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 3.882,
+      "explanation_bleu": 0.25
+    },
+    {
+      "query_id": "Q031",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-14",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q031",
+      "query_type": "blocking_detection",
+      "query": "Find all tasks that cannot proceed because of SPARK-14",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q032",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in SPARK-14",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-14"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 2.768,
+      "explanation_bleu": 0.375
+    },
+    {
+      "query_id": "Q032",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in SPARK-14",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-14",
+        "SPARK-9",
+        "SPARK-11",
+        "SPARK-18",
+        "KAFKA-19",
+        "HADOOP-21",
+        "KAFKA-24",
+        "KAFKA-26",
+        "SPARK-30",
+        "KAFKA-31"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q032",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in SPARK-14",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-14",
+        "KAFKA-15"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q033",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by HADOOP-16",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-16",
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": true,
+      "risk_level_correct": false,
+      "latency_secs": 4.009,
+      "explanation_bleu": 0.4
+    },
+    {
+      "query_id": "Q033",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by HADOOP-16",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-16",
+        "KAFKA-23",
+        "KAFKA-33",
+        "SPARK-35",
+        "KAFKA-48",
+        "HADOOP-51",
+        "HADOOP-59",
+        "KAFKA-61",
+        "KAFKA-69",
+        "HADOOP-78"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q033",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by HADOOP-16",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q034",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to HADOOP-16",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-16",
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.255,
+      "explanation_bleu": 0.25
+    },
+    {
+      "query_id": "Q034",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to HADOOP-16",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-16"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q034",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to HADOOP-16",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q035",
+      "query_type": "blocking_detection",
+      "query": "Is HADOOP-16 blocking any other tasks?",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-16",
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.163,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q035",
+      "query_type": "blocking_detection",
+      "query": "Is HADOOP-16 blocking any other tasks?",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-16"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q035",
+      "query_type": "blocking_detection",
+      "query": "Is HADOOP-16 blocking any other tasks?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q036",
+      "query_type": "delay_explanation",
+      "query": "What caused HADOOP-16 to fall behind schedule?",
+      "system": "ours",
+      "predicted_ids": [
+        "HADOOP-16",
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.127,
+      "explanation_bleu": 0.3
+    },
+    {
+      "query_id": "Q036",
+      "query_type": "delay_explanation",
+      "query": "What caused HADOOP-16 to fall behind schedule?",
+      "system": "keyword",
+      "predicted_ids": [
+        "HADOOP-16"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q036",
+      "query_type": "delay_explanation",
+      "query": "What caused HADOOP-16 to fall behind schedule?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "HADOOP-16",
+        "KAFKA-17"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q037",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because KAFKA-17 is delayed?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.667,
+      "recall": 1.0,
+      "f1": 0.8,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.153,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q037",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because KAFKA-17 is delayed?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-17"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q037",
+      "query_type": "risk_identification",
+      "query": "Which tasks are at risk because KAFKA-17 is delayed?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q038",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from KAFKA-17?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.667,
+      "recall": 1.0,
+      "f1": 0.8,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.373,
+      "explanation_bleu": 0.455
+    },
+    {
+      "query_id": "Q038",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from KAFKA-17?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-17"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q038",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from KAFKA-17?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q039",
+      "query_type": "blocking_detection",
+      "query": "Is KAFKA-17 blocking any other tasks?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.667,
+      "recall": 1.0,
+      "f1": 0.8,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.185,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q039",
+      "query_type": "blocking_detection",
+      "query": "Is KAFKA-17 blocking any other tasks?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-17"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q039",
+      "query_type": "blocking_detection",
+      "query": "Is KAFKA-17 blocking any other tasks?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q040",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in KAFKA-17",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-17",
+        "KAFKA-19",
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.667,
+      "recall": 1.0,
+      "f1": 0.8,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.173,
+      "explanation_bleu": 0.375
+    },
+    {
+      "query_id": "Q040",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in KAFKA-17",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-17",
+        "SPARK-9",
+        "SPARK-11",
+        "SPARK-14",
+        "SPARK-18",
+        "KAFKA-19",
+        "HADOOP-21",
+        "KAFKA-24",
+        "KAFKA-26",
+        "SPARK-30"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.2,
+      "recall": 1.0,
+      "f1": 0.333,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q040",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in KAFKA-17",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-17",
+        "SPARK-18"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q041",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by SPARK-18",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.15,
+      "explanation_bleu": 0.4
+    },
+    {
+      "query_id": "Q041",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by SPARK-18",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-18",
+        "HADOOP-16",
+        "KAFKA-23",
+        "KAFKA-33",
+        "SPARK-35",
+        "KAFKA-48",
+        "HADOOP-51",
+        "HADOOP-59",
+        "KAFKA-61",
+        "KAFKA-69"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q041",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by SPARK-18",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q042",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-18?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.146,
+      "explanation_bleu": 0.455
+    },
+    {
+      "query_id": "Q042",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-18?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q042",
+      "query_type": "root_cause_analysis",
+      "query": "What is causing the risk cascade from SPARK-18?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q043",
+      "query_type": "blocking_detection",
+      "query": "What does SPARK-18 block?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.179,
+      "explanation_bleu": 0.429
+    },
+    {
+      "query_id": "Q043",
+      "query_type": "blocking_detection",
+      "query": "What does SPARK-18 block?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q043",
+      "query_type": "blocking_detection",
+      "query": "What does SPARK-18 block?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q044",
+      "query_type": "delay_explanation",
+      "query": "Why is SPARK-18 delayed?",
+      "system": "ours",
+      "predicted_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": false,
+      "latency_secs": 0.143,
+      "explanation_bleu": 0.429
+    },
+    {
+      "query_id": "Q044",
+      "query_type": "delay_explanation",
+      "query": "Why is SPARK-18 delayed?",
+      "system": "keyword",
+      "predicted_ids": [
+        "SPARK-18"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q044",
+      "query_type": "delay_explanation",
+      "query": "Why is SPARK-18 delayed?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "SPARK-18",
+        "KAFKA-19"
+      ],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "mrr": 0.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.003,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q045",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by KAFKA-19",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": true,
+      "latency_secs": 0.149,
+      "explanation_bleu": 0.4
+    },
+    {
+      "query_id": "Q045",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by KAFKA-19",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-19",
+        "HADOOP-16",
+        "KAFKA-23",
+        "KAFKA-33",
+        "SPARK-35",
+        "KAFKA-48",
+        "HADOOP-51",
+        "HADOOP-59",
+        "KAFKA-61",
+        "KAFKA-69"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.001,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q045",
+      "query_type": "risk_identification",
+      "query": "Show me all tasks blocked by KAFKA-19",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 0.5,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q046",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to KAFKA-19",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": true,
+      "latency_secs": 0.121,
+      "explanation_bleu": 0.25
+    },
+    {
+      "query_id": "Q046",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to KAFKA-19",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q046",
+      "query_type": "root_cause_analysis",
+      "query": "Explain the root cause of delays related to KAFKA-19",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 0.5,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q047",
+      "query_type": "blocking_detection",
+      "query": "Is KAFKA-19 blocking any other tasks?",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": true,
+      "latency_secs": 0.117,
+      "explanation_bleu": 0.333
+    },
+    {
+      "query_id": "Q047",
+      "query_type": "blocking_detection",
+      "query": "Is KAFKA-19 blocking any other tasks?",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.016,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q047",
+      "query_type": "blocking_detection",
+      "query": "Is KAFKA-19 blocking any other tasks?",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 0.5,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q048",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in KAFKA-19",
+      "system": "ours",
+      "predicted_ids": [
+        "KAFKA-19"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.667,
+      "mrr": 1.0,
+      "root_cause_correct": false,
+      "risk_level_correct": true,
+      "latency_secs": 0.167,
+      "explanation_bleu": 0.375
+    },
+    {
+      "query_id": "Q048",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in KAFKA-19",
+      "system": "keyword",
+      "predicted_ids": [
+        "KAFKA-19",
+        "SPARK-9",
+        "SPARK-11",
+        "SPARK-14",
+        "SPARK-18",
+        "HADOOP-21",
+        "KAFKA-24",
+        "KAFKA-26",
+        "SPARK-30",
+        "KAFKA-31"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 1.0,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.0,
+      "explanation_bleu": null
+    },
+    {
+      "query_id": "Q048",
+      "query_type": "delay_explanation",
+      "query": "Explain the delay in KAFKA-19",
+      "system": "cypher",
+      "predicted_ids": [
+        "HADOOP-296",
+        "HADOOP-20",
+        "HADOOP-27",
+        "HADOOP-217",
+        "KAFKA-276",
+        "KAFKA-138",
+        "KAFKA-82",
+        "HADOOP-231",
+        "SPARK-139",
+        "HADOOP-162"
+      ],
+      "expected_ids": [
+        "KAFKA-19",
+        "HADOOP-20"
+      ],
+      "precision": 0.1,
+      "recall": 0.5,
+      "f1": 0.167,
+      "mrr": 0.5,
+      "root_cause_correct": null,
+      "risk_level_correct": null,
+      "latency_secs": 0.002,
+      "explanation_bleu": null
+    }
+  ]
+}

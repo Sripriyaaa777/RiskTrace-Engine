@@ -1,0 +1,13 @@
+{
+  "predicted_path": "data/real_hadoop/dependencies.csv",
+  "gold_path": "validation/edge_gold_template.csv",
+  "gold_pairs": 100,
+  "true_positive": 50,
+  "false_positive": 50,
+  "false_negative": 0,
+  "true_negative": 0,
+  "precision": 0.5,
+  "recall": 1.0,
+  "f1": 0.667,
+  "labeling_note": "Labels in validation/edge_gold_template.csv are heuristic, not manually adjudicated ground truth. Explicit Jira links are labeled positive; inferred edges are labeled positive when they have confidence >= 0.75 and source/target project agreement, and negative otherwise."
+}

@@ -1,0 +1,97 @@
+{
+  "project": "HADOOP",
+  "threshold": 0.35,
+  "model_used": false,
+  "evaluated_issues": [
+    {
+      "issue_id": "HADOOP-282",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": true,
+      "downstream_impact_count": 1,
+      "evaluation_time": "2026-04-05T23:59:59+00:00",
+      "actual_delay_days": 18.68,
+      "actionable_insight": "Fix Issue HADOOP-282 -> reduces risk in 1 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-255",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": true,
+      "downstream_impact_count": 1,
+      "evaluation_time": "2026-04-11T23:59:59+00:00",
+      "actual_delay_days": 12.68,
+      "actionable_insight": "Fix Issue HADOOP-255 -> reduces risk in 1 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-185",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": true,
+      "downstream_impact_count": 1,
+      "evaluation_time": "2026-04-14T23:59:59+00:00",
+      "actual_delay_days": 9.68,
+      "actionable_insight": "Fix Issue HADOOP-185 -> reduces risk in 1 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-178",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": true,
+      "downstream_impact_count": 1,
+      "evaluation_time": "2026-04-20T23:59:59+00:00",
+      "actual_delay_days": 3.68,
+      "actionable_insight": "Fix Issue HADOOP-178 -> reduces risk in 1 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-190",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": true,
+      "downstream_impact_count": 1,
+      "evaluation_time": "2026-04-22T23:59:59+00:00",
+      "actual_delay_days": 1.68,
+      "actionable_insight": "Fix Issue HADOOP-190 -> reduces risk in 1 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-20",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": false,
+      "downstream_impact_count": 2,
+      "evaluation_time": "2026-05-03T23:59:59+00:00",
+      "actual_delay_days": 0.0,
+      "actionable_insight": "Fix Issue HADOOP-20 -> reduces risk in 2 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-38",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": false,
+      "downstream_impact_count": 2,
+      "evaluation_time": "2026-05-18T23:59:59+00:00",
+      "actual_delay_days": 0.0,
+      "actionable_insight": "Fix Issue HADOOP-38 -> reduces risk in 2 dependent issues"
+    },
+    {
+      "issue_id": "HADOOP-21",
+      "risk_score": 0.0,
+      "predicted": false,
+      "actually_delayed": false,
+      "downstream_impact_count": 1,
+      "evaluation_time": "2025-12-29T16:17:06.445764+00:00",
+      "actual_delay_days": 0.0,
+      "actionable_insight": "Fix Issue HADOOP-21 -> reduces risk in 1 dependent issues"
+    }
+  ],
+  "metrics": {
+    "precision": 0.0,
+    "recall": 0.0,
+    "accuracy": 0.375,
+    "flagged_before_delay_accuracy": 0.0,
+    "tp": 0,
+    "fp": 0,
+    "tn": 3,
+    "fn": 5
+  }
+}
